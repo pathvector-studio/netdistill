@@ -79,6 +79,40 @@ netdistill --json show_bgp.txt         # structured JSON for pipelines
 
 Typical agent/pipeline use: run the command, pipe through `netdistill`, hand the digest to the model. If the model needs detail that was elided, re-run with `--full` for just that command — the elision notes tell it exactly what to ask for.
 
+## Integrations
+
+### MCP server (Claude Code and other agents)
+
+```bash
+netdistill mcp        # MCP over stdio, exposes one tool: distill
+```
+
+Register it with Claude Code:
+
+```bash
+claude mcp add netdistill -- netdistill mcp
+```
+
+The agent then gets a `distill` tool (`input` required; optional `full`, `budget`, `format`) and can compress router output before reading it instead of burning its context window.
+
+### HTTP API (any language)
+
+```bash
+netdistill serve                       # http://127.0.0.1:8321
+netdistill serve --listen 0.0.0.0:8321 # your network, your risk — no auth built in
+```
+
+```bash
+# raw body + query params
+ssh r1 'show ip route vrf all' | curl -s --data-binary @- 'localhost:8321/v1/distill?budget=800'
+
+# JSON envelope, JSON out — from Python, Node, Go, anything
+curl -s -H 'content-type: application/json' \
+     -d '{"input": "...", "format": "json"}' localhost:8321/v1/distill
+```
+
+`GET /healthz` for liveness, `GET /` for usage. The JSON response carries `docs[]` (alerts / summary / tables as structure) plus token estimates — handy as a pre-filter: only wake the LLM when `alerts` is non-empty.
+
 ## Design principles
 
 1. **The LLM's job is diagnosis; give it evidence, not logs.** Anomalies and aggregates carry nearly all the diagnostic signal of raw output at a fraction of the tokens.

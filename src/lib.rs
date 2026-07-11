@@ -1,4 +1,6 @@
 pub mod detect;
+pub mod http;
+pub mod mcp;
 pub mod model;
 pub mod render;
 pub mod token;
@@ -16,6 +18,18 @@ use model::Doc;
 
 pub struct Options {
     pub full: bool,
+}
+
+/// One-call convenience shared by the CLI, the MCP server, and the HTTP API:
+/// raw input in, rendered digest (text or JSON) out.
+pub fn distill_to_string(input: &str, full: bool, budget: Option<usize>, json: bool) -> String {
+    let in_tok = token::estimate(input);
+    let docs = distill(input, &Options { full });
+    if json {
+        render::render_json(&docs, in_tok)
+    } else {
+        render::render_text(docs, in_tok, budget)
+    }
 }
 
 /// Distill one blob of input (possibly a whole terminal session containing

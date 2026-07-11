@@ -1,4 +1,4 @@
-use clap::Parser;
+use clap::{Parser, Subcommand};
 use netdistill::{distill, render, token, Options};
 use std::io::Read;
 use std::path::PathBuf;
@@ -10,6 +10,8 @@ use std::path::PathBuf;
     about = "Distill network CLI output and configs into LLM-friendly context.\nPipe in `show` output, configs, or whole terminal session logs."
 )]
 struct Cli {
+    #[command(subcommand)]
+    command: Option<Cmd>,
     /// Input files (default: stdin)
     files: Vec<PathBuf>,
     /// Do not elide healthy/normal entries
@@ -23,8 +25,32 @@ struct Cli {
     json: bool,
 }
 
+#[derive(Subcommand)]
+enum Cmd {
+    /// Run as an MCP server on stdio (for Claude Code and other agents)
+    Mcp,
+    /// Run an HTTP API server callable from any language (POST /v1/distill)
+    Serve {
+        /// Address to listen on
+        #[arg(long, default_value = "127.0.0.1:8321")]
+        listen: String,
+    },
+}
+
 fn main() {
     let cli = Cli::parse();
+
+    match &cli.command {
+        Some(Cmd::Mcp) => {
+            netdistill::mcp::serve_stdio();
+            return;
+        }
+        Some(Cmd::Serve { listen }) => {
+            netdistill::http::serve(listen);
+            return;
+        }
+        None => {}
+    }
     let opts = Options { full: cli.full };
     let mut docs = Vec::new();
     let mut in_tok = 0usize;

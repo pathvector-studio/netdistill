@@ -58,6 +58,40 @@ netdistill --json show_bgp.txt         # パイプライン向け JSON
 
 エージェント/パイプラインでの典型: コマンド実行 → `netdistill` に通す → ダイジェストをモデルへ。省略された詳細が必要になったら、そのコマンドだけ `--full` で再実行。省略ノートが「何を再要求すべきか」をモデルに教えます。
 
+## 組み込み方法
+
+### MCP サーバ（Claude Code などのエージェント向け）
+
+```bash
+netdistill mcp        # stdio 上の MCP。distill ツールを1つ公開
+```
+
+Claude Code への登録:
+
+```bash
+claude mcp add netdistill -- netdistill mcp
+```
+
+エージェント側には `distill` ツール（必須 `input`、任意 `full` / `budget` / `format`）が生え、ルータ出力をコンテキストに流し込む前に圧縮できます。
+
+### HTTP API（任意の言語から）
+
+```bash
+netdistill serve                       # http://127.0.0.1:8321
+netdistill serve --listen 0.0.0.0:8321 # 外部公開は自己責任 — 認証は内蔵していません
+```
+
+```bash
+# 生テキスト + クエリパラメータ
+ssh r1 'show ip route vrf all' | curl -s --data-binary @- 'localhost:8321/v1/distill?budget=800'
+
+# JSON エンベロープで投げて JSON で受ける — Python でも Node でも Go でも
+curl -s -H 'content-type: application/json' \
+     -d '{"input": "...", "format": "json"}' localhost:8321/v1/distill
+```
+
+`GET /healthz` で死活監視、`GET /` で使い方。JSON レスポンスには `docs[]`（alerts / summary / tables が構造のまま）とトークン推定が入るので、「`alerts` が空でなければ LLM を起こす」という**前段フィルタ**にも使えます。
+
 ## 設計原則
 
 1. **LLM の仕事は診断。ログではなく証拠を渡す。** 異常と集計は、生出力の持つ診断情報のほぼ全てを数百分の一のトークンで運ぶ。

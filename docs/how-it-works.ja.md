@@ -170,6 +170,13 @@ NOTES:
 
 **ALERTS と SUMMARY は絶対に削らない**のが不変条件です。予算がどれだけ小さくても「異常の列挙と全体像」だけは完全な形で残ります。半減ループなので計算量は O(log(行数)) 回の再描画で収まります。
 
+## [6] サーバモード — `mcp.rs` / `http.rs`
+
+どちらのサーバも CLI と同じ `distill_to_string(input, full, budget, json)` の薄いラッパーです。コードパスが分岐しないため、3つの入口（CLI / MCP / HTTP）で挙動は完全に一致します。
+
+- **MCP** (`netdistill mcp`): stdio 上の改行区切り JSON-RPC 2.0。`initialize`（クライアントのプロトコルバージョンをエコー）・`ping`・`tools/list`・`tools/call` を実装。notification には応答せず、未知のメソッド/ツールには正規の JSON-RPC エラー(-32601/-32602)を返す。ツールは `distill` の1つ
+- **HTTP** (`netdistill serve`): 4スレッドの `tiny_http` サーバ。`POST /v1/distill` は生テキストボディ（オプションはクエリ文字列）と JSON エンベロープの両対応。`route()` は (method, path, query, content-type, body) の純関数で、ソケットなしで単体テスト済み。認証は意図的に非搭載 — 既定の localhost バインドのまま使うか、自前のプロキシを前段に置くこと
+
 ## 圧縮率の構造
 
 50,000経路 → 164トークン (99.98%) の内訳を分解すると:

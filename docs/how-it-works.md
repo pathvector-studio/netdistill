@@ -170,6 +170,13 @@ NOTES:
 
 The invariant: **ALERTS and SUMMARY are never trimmed**. However small the budget, the anomaly list and the overall picture survive intact. Halving means the loop re-renders only O(log rows) times.
 
+## [6] Serving modes — `mcp.rs` / `http.rs`
+
+Both servers are thin wrappers over the same `distill_to_string(input, full, budget, json)` call the CLI uses — no separate code path, so behavior is identical across all three entry points.
+
+- **MCP** (`netdistill mcp`): newline-delimited JSON-RPC 2.0 over stdio. Implements `initialize` (echoes the client's protocol version), `ping`, `tools/list`, `tools/call`; notifications get no response, unknown methods/tools return proper JSON-RPC errors (-32601/-32602). One tool: `distill`.
+- **HTTP** (`netdistill serve`): a 4-thread `tiny_http` server. `POST /v1/distill` accepts either the raw CLI output as the body (options via query string) or a JSON envelope; `route()` is a pure function of (method, path, query, content-type, body) and is unit-tested without sockets. No auth by design — bind to localhost (default) or front it yourself.
+
 ## Where the compression comes from
 
 Decomposing the 50,000-route → 164-token (99.98%) result:
