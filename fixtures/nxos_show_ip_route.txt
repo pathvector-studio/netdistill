@@ -1,0 +1,22 @@
+IP Route Table for VRF "default"
+'*' denotes best ucast next-hop
+'**' denotes best mcast next-hop
+'[x/y]' denotes [preference/metric]
+
+0.0.0.0/0, ubest/mbest: 1/0
+    *via 172.16.0.1, [1/0], 10w2d, static
+10.0.0.0/30, ubest/mbest: 1/0, attached
+    *via 10.0.0.2, Eth1/1, [0/0], 10w2d, direct
+10.0.0.2/32, ubest/mbest: 1/0, attached
+    *via 10.0.0.2, Eth1/1, [0/0], 10w2d, local
+10.1.0.0/24, ubest/mbest: 2/0
+    *via 10.0.0.1, Eth1/1, [110/41], 3d02h, ospf-1, intra
+    *via 10.0.0.5, Eth1/2, [110/41], 3d02h, ospf-1, intra
+10.2.0.0/24, ubest/mbest: 1/0
+    *via 10.0.12.2, [20/0], 5w4d, bgp-64512, external, tag 64513
+
+IP Route Table for VRF "management"
+'*' denotes best ucast next-hop
+
+192.168.100.0/24, ubest/mbest: 1/0, attached
+    *via 192.168.100.9, mgmt0, [0/0], 10w2d, direct

@@ -2,7 +2,10 @@ use netdistill::detect::{detect, Kind};
 use netdistill::render::render_body;
 use netdistill::{distill, Options};
 
-const OPTS: Options = Options { full: false };
+const OPTS: Options = Options {
+    full: false,
+    kind: None,
+};
 
 fn fx(name: &str) -> String {
     std::fs::read_to_string(format!("fixtures/{name}")).unwrap()

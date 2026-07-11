@@ -1,0 +1,55 @@
+system {
+    host-name edge-nagoya-1;
+    ntp {
+        server 192.168.100.10;
+    }
+    login {
+        user admin {
+            class super-user;
+            authentication {
+                encrypted-password "$6$REDACTED";
+            }
+        }
+    }
+}
+interfaces {
+    ge-0/0/0 {
+        description "uplink-to-core1";
+        unit 0 {
+            family inet {
+                address 10.0.0.2/30;
+            }
+        }
+    }
+    ge-0/0/2 {
+        disable;
+    }
+    lo0 {
+        unit 0 {
+            family inet {
+                address 10.255.0.2/32;
+            }
+        }
+    }
+}
+protocols {
+    bgp {
+        group TRANSIT {
+            type external;
+            neighbor 10.0.12.2 {
+                peer-as 64513;
+                description "transit-a";
+            }
+        }
+    }
+}
+policy-options {
+    prefix-list DEFAULT-ONLY {
+        0.0.0.0/0;
+    }
+}
+routing-options {
+    static {
+        route 172.16.0.0/16 next-hop 10.0.0.9;
+    }
+}

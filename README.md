@@ -49,14 +49,15 @@ The three broken peers survive; the 497 healthy ones collapse into one line.
 
 | input | detected as | distillation |
 |---|---|---|
-| `show bgp summary` (IOS / FRR / EOS-style, Junos) | `bgp-summary` | peer-state census, prefix totals, top peers; only broken/notable peers listed |
+| `show bgp summary` (IOS / IOS-XR / FRR / NX-OS / EOS / Huawei VRP / Junos) | `bgp-summary` | peer-state census, prefix totals, top peers; only broken/notable peers listed |
 | `show ip bgp` full table (IOS / FRR) | `bgp-table` | networks/paths/best counts, origin-AS histogram, AS-path length stats, suppressed/damped/RIB-failure alerts — never re-emits prefixes |
-| `show ip route [vrf all]` (IOS/XR), `show route` (Junos) | `route-table` | per-VRF × protocol matrix, default-route presence, top next-hops, hidden-route alerts |
+| `show ip route [vrf all]` (IOS/XR/NX-OS), `show route` (Junos) | `route-table` | per-VRF × protocol matrix, default-route presence, top next-hops, hidden-route alerts |
 | `show interfaces` (IOS-style) | `interfaces` | up/down census; only interfaces with errors, drops, or unexpected down state listed |
 | `show ip ospf neighbor` (IOS / FRR) | `ospf-neighbors` | state census per interface; only non-FULL (stuck) adjacencies listed, 2WAY/DROTHER treated as healthy |
 | `show isis neighbors` (IOS / FRR) | `isis-neighbors` | level/interface census; only non-UP adjacencies listed |
 | `show lldp neighbors` (IOS-style) | `lldp-neighbors` | inventory kept whole (topology data), padding dropped; alerts if the declared entry count mismatches parsed rows |
 | running/startup config (IOS-style) | `config` | inventory digest: interfaces table, BGP neighbors, VRFs, policy object counts. Secrets are never echoed |
+| `show configuration` (Junos, set-style **and** hierarchical) | `junos-config` | same inventory digest; both styles normalize to one extractor. Secrets are never echoed |
 | anything else | `generic` | lossless-ish compaction: padding → tabs, duplicate lines → `[xN]`, blank runs collapsed |
 
 Paste a **whole terminal session** and it splits on prompt lines (`router1# show ...`) and distills each command separately.
@@ -85,6 +86,7 @@ ssh router1 'show ip route vrf all' | netdistill     # or stdin
 netdistill --full show_bgp.txt         # keep every row (still restructured)
 netdistill --budget 800 session.log    # trim tables to fit ~800 tokens
 netdistill --json show_bgp.txt         # structured JSON for pipelines
+netdistill --kind route-table dump.txt # force a parser, skip auto-detection
 ```
 
 Typical agent/pipeline use: run the command, pipe through `netdistill`, hand the digest to the model. If the model needs detail that was elided, re-run with `--full` for just that command — the elision notes tell it exactly what to ask for.

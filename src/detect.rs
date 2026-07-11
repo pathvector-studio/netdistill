@@ -8,7 +8,40 @@ pub enum Kind {
     IsisNeighbors,
     LldpNeighbors,
     Config,
+    JunosConfig,
     Generic,
+}
+
+impl Kind {
+    /// Parse a user-supplied kind name (for --kind / API overrides).
+    pub fn from_name(s: &str) -> Option<Kind> {
+        Some(match s {
+            "bgp-summary" => Kind::BgpSummary,
+            "bgp-table" => Kind::BgpTable,
+            "route-table" => Kind::RouteTable,
+            "interfaces" => Kind::Interfaces,
+            "ospf-neighbors" => Kind::OspfNeighbors,
+            "isis-neighbors" => Kind::IsisNeighbors,
+            "lldp-neighbors" => Kind::LldpNeighbors,
+            "config" => Kind::Config,
+            "junos-config" => Kind::JunosConfig,
+            "generic" => Kind::Generic,
+            _ => return None,
+        })
+    }
+
+    pub const NAMES: [&'static str; 10] = [
+        "bgp-summary",
+        "bgp-table",
+        "route-table",
+        "interfaces",
+        "ospf-neighbors",
+        "isis-neighbors",
+        "lldp-neighbors",
+        "config",
+        "junos-config",
+        "generic",
+    ];
 }
 
 /// Best-effort classification of a chunk of CLI output.
@@ -41,12 +74,31 @@ pub fn detect(input: &str) -> Kind {
         return Kind::LldpNeighbors;
     }
     if has("Routing Table:")
+        || has("IP Route Table for VRF")
         || has("Gateway of last resort")
         || has("variably subnetted")
         || head.iter().any(|l| l.trim_start().starts_with("Codes:"))
         || head.iter().any(|l| junos_rib_header(l).is_some())
     {
         return Kind::RouteTable;
+    }
+    // Junos configs: `display set` style, or the hierarchical braces style.
+    let sets = input
+        .lines()
+        .filter(|l| l.trim_start().starts_with("set "))
+        .count();
+    if sets >= 3 {
+        return Kind::JunosConfig;
+    }
+    let opens = input
+        .lines()
+        .filter(|l| l.trim_end().ends_with('{'))
+        .count();
+    if opens >= 3
+        && input.lines().any(|l| l.trim_end().ends_with(';'))
+        && (has("host-name") || has("system {") || has("interfaces {"))
+    {
+        return Kind::JunosConfig;
     }
     let bangs = input.lines().filter(|l| l.trim() == "!").count();
     let has_iface_block = input.lines().any(|l| l.starts_with("interface "));

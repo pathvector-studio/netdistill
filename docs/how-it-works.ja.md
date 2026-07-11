@@ -70,7 +70,16 @@ Junos RIB ヘッダの判定 (`junos_rib_header`) は「`:` で分割 → 名前
 
 ### bgp-summary (`parse/bgp_summary.rs`)
 
-**方言の自動切替**: ヘッダ行に `InPkt`+`OutPkt` を見たら Junos モード、`Neighbor`+`MsgRcvd` を見たら IOS/FRR モード。行単位で切り替わるのでモード宣言は不要。
+**方言の自動切替**はヘッダ行単位で行われ、事前宣言は不要:
+
+| ヘッダに含まれる語 | モード | 列の意味 |
+|---|---|---|
+| `InPkt` + `OutPkt` | Junos | Established ピアは `a/b/c/d` 形式 |
+| `PfxAcc` | EOS | 状態語が第8列、PfxRcd が第9列 |
+| `PrefRcv` | Huawei VRP | 状態語が第7列、PrefRcv が第8列 |
+| `Neighbor` + `MsgRcvd` | IOS / IOS-XR / FRR / NX-OS | State/PfxRcd が第9列を共有（XR の `Spk` 列は IOS の `V` と同位置） |
+
+router-id/AS のバナー変種: `BGP router identifier X, local AS [number] Y`（IOS/XR/NX-OS）、`Router identifier X`（EOS）、`BGP local router ID :` / `Local AS number :`（VRP）。NX-OS/EOS のセクションヘッダ（`BGP summary information for VRF ...`）は section ラベルになる。
 
 **行の採用基準**: 先頭トークンが IP アドレスに見える行だけをピア行として読む。`is_addr` は「`.` を含み数字と`.`のみ」（v4）または「`:` を含み16進と`:.`のみ」（v6）。FRR の dynamic peer 接頭辞 `*` は剥がします。
 
@@ -103,6 +112,8 @@ Junos RIB ヘッダの判定 (`junos_rib_header`) は「`:` で分割 → 名前
 - デフォルトルート: `Gateway of last resort is <X>`（`not set` なら無し）と `0.0.0.0/0` / `::/0` エントリの両方から検出
 
 **Junos の経路行**: 先頭トークンが prefix で第2トークンが `*[Proto/pref]` 形式。プロトコルはブラケット内から取得。続く `> to <nh> via <if>` 行で next-hop を数え、直前エントリがデフォルトルートなら default_via をその nh で確定。
+
+**NX-OS**（`IP Route Table for VRF "x"`）: prefix 行（`10.1.0.0/24, ubest/mbest: 2/0`）にはプロトコルが無く、最初の `*via ..., ospf-1, intra` 行のカンマ区切りフィールドから既知プロトコルトークンを探して決定（`ospf-1` → ospf、`direct` → connected）。ECMP: 2本目以降の `*via` 行は next-hop のみ加算し経路数は増やさない。
 
 **アラート**: 経路数0のテーブル / hidden route を持つテーブル（Junos。ポリシーで隠された経路は障害調査で最初に見るべき場所）。
 
@@ -154,6 +165,10 @@ IOS config の構造規約「ブロックの子行は空白1つでインデン�
 ### lldp-neighbors (`parse/lldp_neighbors.rs`)
 
 状態ではなくインベントリ: 全行が固有情報なので**何も省略しない** — 効くのはパディング→タブと hold-time 列の除去のみ。アラートは1種類: `Total entries displayed: N` とパース行数の不一致（出力の切断か未知方言 = 自分自身への正直チェック）。
+
+### junos-config (`parse/juniper_config.rs`)
+
+`| display set` 形式とネイティブの階層（波括弧）形式の両方を**単一の抽出器**で処理する。階層形式はまず波括弧ウォーカー（`{` でブロック名を push、`}` で pop、`;` でスタック＋リーフを出力）で set 形式相当のステートメントパスに平坦化されるため、すべてのルールは `["protocols","bgp","group",g,"neighbor",ip,"peer-as",as]` のようなトークンパスに対して一度だけ書けばよい。クォート対応トークナイザが `description "a b"` を1トークンに保つ。シークレット（`encrypted-password`、各種キー）は IOS config パーサと同様に構造ごと破棄。
 
 ### generic (`parse/generic.rs`)
 

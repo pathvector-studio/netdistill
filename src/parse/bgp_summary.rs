@@ -30,26 +30,62 @@ fn norm_state(s: &str) -> String {
     }
 }
 
+#[derive(Clone, Copy, PartialEq)]
+enum Mode {
+    /// IOS / IOS-XR / FRR / NX-OS: State/PfxRcd share one column.
+    IosFrr,
+    /// Junos: established peers show a/b/c/d counts, others a state word.
+    Junos,
+    /// Word-state dialects (Arista EOS, Huawei VRP): up/down, state, and
+    /// received-prefix count each in their own column.
+    StateCol {
+        updown: usize,
+        state: usize,
+        pfx: usize,
+    },
+}
+
 /// Parse `show bgp summary` in IOS / FRR / EOS style and Junos style.
 pub fn parse(input: &str, full: bool) -> Doc {
     let mut router_id: Option<String> = None;
     let mut local_as: Option<String> = None;
     let mut peers: Vec<Peer> = Vec::new();
     let mut section = String::new();
-    let mut junos = false;
+    let mut mode = Mode::IosFrr;
 
     for raw in input.lines() {
         let line = raw.trim_end();
         let t = line.trim_start();
-        if let Some(rest) = t.strip_prefix("BGP router identifier ") {
+        // "BGP router identifier ..." (IOS/FRR/XR; NX-OS says "local AS" without
+        // "number") and "Router identifier ..." (EOS).
+        if let Some(rest) = t
+            .strip_prefix("BGP router identifier ")
+            .or_else(|| t.strip_prefix("Router identifier "))
+        {
             router_id = rest.split(',').next().map(|s| s.trim().to_string());
-            let tag = "local AS number ";
-            if let Some(p) = rest.find(tag) {
-                local_as = rest[p + tag.len()..]
-                    .split_whitespace()
-                    .next()
-                    .map(str::to_string);
+            for tag in ["local AS number ", "local AS "] {
+                if let Some(p) = rest.find(tag) {
+                    local_as = rest[p + tag.len()..]
+                        .split_whitespace()
+                        .next()
+                        .map(str::to_string);
+                    break;
+                }
             }
+            continue;
+        }
+        // Huawei VRP banner lines.
+        if let Some(rest) = t.strip_prefix("BGP local router ID : ") {
+            router_id = Some(rest.trim().to_string());
+            continue;
+        }
+        if let Some(rest) = t.strip_prefix("Local AS number : ") {
+            local_as = rest.split_whitespace().next().map(str::to_string);
+            continue;
+        }
+        // NX-OS / EOS: "BGP summary information for VRF default[, address family ...]"
+        if let Some(rest) = t.strip_prefix("BGP summary information for ") {
+            section = rest.trim().to_string();
             continue;
         }
         if let Some(rest) = t.strip_prefix("For address family: ") {
@@ -65,7 +101,29 @@ pub fn parse(input: &str, full: bool) -> Doc {
             continue;
         }
         if t.contains("InPkt") && t.contains("OutPkt") {
-            junos = true;
+            mode = Mode::Junos;
+            continue;
+        }
+        if t.contains("PfxAcc") {
+            // EOS: Neighbor V AS MsgRcvd MsgSent InQ OutQ Up/Down State PfxRcd PfxAcc
+            mode = Mode::StateCol {
+                updown: 7,
+                state: 8,
+                pfx: 9,
+            };
+            continue;
+        }
+        if t.contains("PrefRcv") {
+            // VRP: Peer V AS MsgRcvd MsgSent OutQ Up/Down State PrefRcv
+            mode = Mode::StateCol {
+                updown: 6,
+                state: 7,
+                pfx: 8,
+            };
+            continue;
+        }
+        if t.starts_with("Neighbor") && t.contains("MsgRcvd") {
+            mode = Mode::IosFrr;
             continue;
         }
 
@@ -75,7 +133,7 @@ pub fn parse(input: &str, full: bool) -> Doc {
         }
         if !is_addr(f[0]) {
             // Junos per-RIB continuation for an established peer: "inet.0: 2/4/4/0"
-            if junos
+            if mode == Mode::Junos
                 && raw.starts_with(' ')
                 && f.len() == 2
                 && f[0].ends_with(':')
@@ -93,7 +151,26 @@ pub fn parse(input: &str, full: bool) -> Doc {
             }
             continue;
         }
-        if junos {
+        if let Mode::StateCol { updown, state, pfx } = mode {
+            if f.len() <= state {
+                continue;
+            }
+            let st = norm_state(f[state]);
+            let p = if st == "Established" {
+                f.get(pfx).and_then(|v| v.parse().ok())
+            } else {
+                None
+            };
+            peers.push(Peer {
+                addr: f[0].to_string(),
+                asn: f[2].to_string(),
+                state: st,
+                updown: f[updown].to_string(),
+                pfx: p,
+                flaps: None,
+                section: section.clone(),
+            });
+        } else if mode == Mode::Junos {
             if f.len() < 8 {
                 continue;
             }

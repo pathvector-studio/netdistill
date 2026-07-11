@@ -10,8 +10,8 @@ use tiny_http::{Header, Response, Server};
 const USAGE: &str = "netdistill HTTP API\n\
 \n\
 POST /v1/distill    body = raw CLI output (text/plain)\n\
-                    query: ?full=1  ?budget=800  ?format=json\n\
-                    or JSON body: {\"input\": \"...\", \"full\": false, \"budget\": 800, \"format\": \"text\"|\"json\"}\n\
+                    query: ?full=1  ?budget=800  ?format=json  ?kind=<parser>\n\
+                    or JSON body: {\"input\": \"...\", \"full\": false, \"budget\": 800, \"format\": \"text\"|\"json\", \"kind\": \"...\"}\n\
 GET  /healthz       liveness + version\n";
 
 pub fn serve(listen: &str) {
@@ -77,33 +77,43 @@ pub fn route(
         ),
         ("GET", "/") => (200, "text/plain; charset=utf-8".into(), USAGE.to_string()),
         ("POST", "/v1/distill") => {
-            let (input, full, budget, as_json) = if content_type.contains("application/json") {
-                let v: serde_json::Value = match serde_json::from_str(body) {
-                    Ok(v) => v,
-                    Err(e) => return bad_request(&format!("invalid JSON body: {e}")),
+            let (input, full, budget, as_json, kind_name) =
+                if content_type.contains("application/json") {
+                    let v: serde_json::Value = match serde_json::from_str(body) {
+                        Ok(v) => v,
+                        Err(e) => return bad_request(&format!("invalid JSON body: {e}")),
+                    };
+                    let Some(input) = v.get("input").and_then(|i| i.as_str()).map(str::to_string)
+                    else {
+                        return bad_request("missing required field: input");
+                    };
+                    (
+                        input,
+                        v.get("full").and_then(|b| b.as_bool()).unwrap_or(false),
+                        v.get("budget").and_then(|b| b.as_u64()).map(|b| b as usize),
+                        v.get("format").and_then(|f| f.as_str()) == Some("json"),
+                        v.get("kind").and_then(|k| k.as_str()).map(str::to_string),
+                    )
+                } else {
+                    if body.is_empty() {
+                        return bad_request("empty body: POST the raw CLI output");
+                    }
+                    (
+                        body.to_string(),
+                        matches!(qparam(query, "full"), Some("1") | Some("true") | Some("")),
+                        qparam(query, "budget").and_then(|b| b.parse().ok()),
+                        qparam(query, "format") == Some("json"),
+                        qparam(query, "kind").map(str::to_string),
+                    )
                 };
-                let Some(input) = v.get("input").and_then(|i| i.as_str()).map(str::to_string)
-                else {
-                    return bad_request("missing required field: input");
-                };
-                (
-                    input,
-                    v.get("full").and_then(|b| b.as_bool()).unwrap_or(false),
-                    v.get("budget").and_then(|b| b.as_u64()).map(|b| b as usize),
-                    v.get("format").and_then(|f| f.as_str()) == Some("json"),
-                )
-            } else {
-                if body.is_empty() {
-                    return bad_request("empty body: POST the raw CLI output");
-                }
-                (
-                    body.to_string(),
-                    matches!(qparam(query, "full"), Some("1") | Some("true") | Some("")),
-                    qparam(query, "budget").and_then(|b| b.parse().ok()),
-                    qparam(query, "format") == Some("json"),
-                )
+            let kind = match kind_name.as_deref() {
+                Some(name) => match crate::detect::Kind::from_name(name) {
+                    Some(k) => Some(k),
+                    None => return bad_request(&format!("unknown kind: {name}")),
+                },
+                None => None,
             };
-            let out = crate::distill_to_string(&input, full, budget, as_json);
+            let out = crate::distill_to_string(&input, full, budget, as_json, kind);
             let out_type = if as_json {
                 "application/json"
             } else {

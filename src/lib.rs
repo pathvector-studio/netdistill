@@ -12,6 +12,7 @@ pub mod parse {
     pub mod generic;
     pub mod interfaces;
     pub mod isis_neighbors;
+    pub mod juniper_config;
     pub mod lldp_neighbors;
     pub mod ospf_neighbors;
     pub mod route;
@@ -22,13 +23,21 @@ use model::Doc;
 
 pub struct Options {
     pub full: bool,
+    /// Force a specific parser instead of auto-detection.
+    pub kind: Option<Kind>,
 }
 
 /// One-call convenience shared by the CLI, the MCP server, and the HTTP API:
 /// raw input in, rendered digest (text or JSON) out.
-pub fn distill_to_string(input: &str, full: bool, budget: Option<usize>, json: bool) -> String {
+pub fn distill_to_string(
+    input: &str,
+    full: bool,
+    budget: Option<usize>,
+    json: bool,
+    kind: Option<Kind>,
+) -> String {
     let in_tok = token::estimate(input);
-    let docs = distill(input, &Options { full });
+    let docs = distill(input, &Options { full, kind });
     if json {
         render::render_json(&docs, in_tok)
     } else {
@@ -42,7 +51,7 @@ pub fn distill(input: &str, opts: &Options) -> Vec<Doc> {
     split_sessions(input)
         .into_iter()
         .map(|(label, chunk)| {
-            let mut doc = match detect::detect(&chunk) {
+            let mut doc = match opts.kind.unwrap_or_else(|| detect::detect(&chunk)) {
                 Kind::BgpSummary => parse::bgp_summary::parse(&chunk, opts.full),
                 Kind::BgpTable => parse::bgp_table::parse(&chunk, opts.full),
                 Kind::RouteTable => parse::route::parse(&chunk, opts.full),
@@ -51,6 +60,7 @@ pub fn distill(input: &str, opts: &Options) -> Vec<Doc> {
                 Kind::IsisNeighbors => parse::isis_neighbors::parse(&chunk, opts.full),
                 Kind::LldpNeighbors => parse::lldp_neighbors::parse(&chunk, opts.full),
                 Kind::Config => parse::config::parse(&chunk, opts.full),
+                Kind::JunosConfig => parse::juniper_config::parse(&chunk, opts.full),
                 Kind::Generic => parse::generic::parse(&chunk),
             };
             if let Some(cmd) = label {

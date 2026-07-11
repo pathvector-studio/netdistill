@@ -54,6 +54,19 @@ fn via_of(t: &str) -> Option<String> {
     }
 }
 
+/// NX-OS via-line protocol token: "ospf-1", "bgp-65000", "direct", "static", ...
+fn nxos_proto(tok: &str) -> Option<String> {
+    let base = tok.trim().split('-').next().unwrap_or("");
+    match base {
+        "direct" => Some("connected".into()),
+        "local" => Some("local".into()),
+        "static" | "ospf" | "bgp" | "eigrp" | "rip" | "isis" | "kernel" => Some(base.into()),
+        "am" => Some("arp".into()),
+        "hsrp" | "vrrp" | "broadcast" => Some(base.into()),
+        _ => None,
+    }
+}
+
 fn num_before_word(s: &str, word: &str) -> Option<u64> {
     let p = s.find(word)?;
     s[..p]
@@ -72,7 +85,10 @@ pub fn parse(input: &str, full: bool) -> Doc {
     let mut nexthops: BTreeMap<String, u64> = BTreeMap::new();
     let mut entries: Vec<[String; 4]> = Vec::new(); // rib, prefix, proto, via
     let mut junos = false;
+    let mut nxos = false;
     let mut pending_default = false;
+    // NX-OS: the prefix line carries no protocol; the first "*via" line does.
+    let mut nx_pending: Option<String> = None;
 
     fn rib_of<'a>(
         ribs: &'a mut BTreeMap<String, Rib>,
@@ -99,6 +115,13 @@ pub fn parse(input: &str, full: bool) -> Doc {
             r.hidden = num_before_word(&rest, "hidden").unwrap_or(0);
             continue;
         }
+        // NX-OS: IP Route Table for VRF "default"
+        if let Some(rest) = t.strip_prefix("IP Route Table for VRF ") {
+            nxos = true;
+            cur = rest.trim().trim_matches('"').to_string();
+            rib_of(&mut ribs, &mut order, &cur);
+            continue;
+        }
         if let Some(rest) = t.strip_prefix("Routing Table: ") {
             cur = rest.trim().to_string();
             rib_of(&mut ribs, &mut order, &cur);
@@ -119,6 +142,37 @@ pub fn parse(input: &str, full: bool) -> Doc {
                 r.default_via = Some(via);
             } else {
                 rib_of(&mut ribs, &mut order, &cur);
+            }
+            continue;
+        }
+
+        if nxos {
+            // "10.1.0.0/24, ubest/mbest: 1/0"
+            if let Some((pfx, _)) = t.split_once(", ubest/mbest") {
+                nx_pending = Some(pfx.trim().to_string());
+                continue;
+            }
+            // "    *via 10.0.0.2, Eth1/1, [110/41], 3d02h, ospf-1, intra"
+            let vt = t.trim_start_matches('*');
+            if let Some(rest) = vt.strip_prefix("via ") {
+                let parts: Vec<&str> = rest.split(", ").collect();
+                let nh = parts[0].trim().to_string();
+                if nh.contains('.') || nh.contains(':') {
+                    *nexthops.entry(nh.clone()).or_insert(0) += 1;
+                }
+                if let Some(pfx) = nx_pending.take() {
+                    let proto = parts
+                        .iter()
+                        .find_map(|p| nxos_proto(p))
+                        .unwrap_or_else(|| "?".to_string());
+                    let r = rib_of(&mut ribs, &mut order, &cur);
+                    r.total += 1;
+                    *r.proto.entry(proto.clone()).or_insert(0) += 1;
+                    if (pfx == "0.0.0.0/0" || pfx == "::/0") && r.default_via.is_none() {
+                        r.default_via = Some(nh.clone());
+                    }
+                    entries.push([cur.clone(), pfx, proto, nh]);
+                }
             }
             continue;
         }

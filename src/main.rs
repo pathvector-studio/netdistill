@@ -23,6 +23,11 @@ struct Cli {
     /// Emit structured JSON instead of text
     #[arg(long)]
     json: bool,
+    /// Force a specific parser instead of auto-detection
+    /// (bgp-summary, bgp-table, route-table, interfaces, ospf-neighbors,
+    /// isis-neighbors, lldp-neighbors, config, junos-config, generic)
+    #[arg(long)]
+    kind: Option<String>,
 }
 
 #[derive(Subcommand)]
@@ -40,6 +45,16 @@ enum Cmd {
 fn main() {
     let cli = Cli::parse();
 
+    let kind = cli.kind.as_deref().map(|name| {
+        netdistill::detect::Kind::from_name(name).unwrap_or_else(|| {
+            eprintln!(
+                "netdistill: unknown --kind '{name}' (expected one of: {})",
+                netdistill::detect::Kind::NAMES.join(", ")
+            );
+            std::process::exit(2);
+        })
+    });
+
     match &cli.command {
         Some(Cmd::Mcp) => {
             netdistill::mcp::serve_stdio();
@@ -51,7 +66,10 @@ fn main() {
         }
         None => {}
     }
-    let opts = Options { full: cli.full };
+    let opts = Options {
+        full: cli.full,
+        kind,
+    };
     let mut docs = Vec::new();
     let mut in_tok = 0usize;
 

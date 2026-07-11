@@ -28,14 +28,15 @@
 
 | 入力 | 判定 | 蒸留内容 |
 |---|---|---|
-| `show bgp summary` (IOS / FRR / EOS系, Junos) | `bgp-summary` | ピア状態の集計、経路数合計、上位ピア。異常/注目ピアのみ列挙 |
+| `show bgp summary` (IOS / IOS-XR / FRR / NX-OS / EOS / Huawei VRP / Junos) | `bgp-summary` | ピア状態の集計、経路数合計、上位ピア。異常/注目ピアのみ列挙 |
 | `show ip bgp` フルテーブル (IOS / FRR) | `bgp-table` | networks/paths/best 集計、origin AS ヒストグラム、AS パス長統計、suppressed/damped/RIB-failure 警告。prefix は再出力しない |
-| `show ip route [vrf all]` (IOS/XR), `show route` (Junos) | `route-table` | VRF×プロトコル表、デフォルトルート有無、上位 next-hop、hidden route 警告 |
+| `show ip route [vrf all]` (IOS/XR/NX-OS), `show route` (Junos) | `route-table` | VRF×プロトコル表、デフォルトルート有無、上位 next-hop、hidden route 警告 |
 | `show interfaces` (IOS系) | `interfaces` | up/down 集計。エラー・ドロップ・想定外 down の IF のみ列挙 |
 | `show ip ospf neighbor` (IOS / FRR) | `ospf-neighbors` | IF別の状態集計。FULL でない(スタックした)隣接のみ列挙。2WAY/DROTHER は正常扱い |
 | `show isis neighbors` (IOS / FRR) | `isis-neighbors` | レベル/IF 別集計。UP でない隣接のみ列挙 |
 | `show lldp neighbors` (IOS系) | `lldp-neighbors` | インベントリは全行保持(トポロジ情報)、パディングのみ除去。宣言件数とパース行数の不一致を警告 |
 | running/startup config (IOS系) | `config` | インベントリ要約: IF 表、BGP ネイバー、VRF、ポリシー数。シークレットは出力しない |
+| `show configuration` (Junos、set形式**と**階層形式の両方) | `junos-config` | 同様のインベントリ要約。両形式を単一の抽出器に正規化。シークレットは出力しない |
 | その他すべて | `generic` | 準ロスレス圧縮: パディング→タブ、重複行→`[xN]`、空行圧縮 |
 
 **ターミナルセッション丸ごと**を貼ると、プロンプト行（`router1# show ...`）で分割してコマンドごとに蒸留します。
@@ -64,6 +65,7 @@ ssh router1 'show ip route vrf all' | netdistill     # stdin でも
 netdistill --full show_bgp.txt         # 全行残す（構造化はされる）
 netdistill --budget 800 session.log    # 約800トークンに収まるよう表を削る
 netdistill --json show_bgp.txt         # パイプライン向け JSON
+netdistill --kind route-table dump.txt # 自動判定を使わずパーサを強制指定
 ```
 
 エージェント/パイプラインでの典型: コマンド実行 → `netdistill` に通す → ダイジェストをモデルへ。省略された詳細が必要になったら、そのコマンドだけ `--full` で再実行。省略ノートが「何を再要求すべきか」をモデルに教えます。

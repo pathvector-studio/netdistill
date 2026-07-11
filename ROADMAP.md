@@ -15,17 +15,21 @@
 - [x] `show ip bgp` full-table digest (origin-AS histogram, AS-path stats, s/d/r alerts)
 - [x] `show ip ospf neighbor`, `show isis neighbors`, `show lldp neighbors`
 - [x] Release binaries (release.yml: linux musl x86_64/aarch64, macOS x86_64/arm64) — no Rust toolchain needed to run
-- [ ] IOS-XR native formats (`show route vrf all` XR headers, `show bgp instance all`)
-- [ ] NX-OS / EOS / Huawei VRP dialects
-- [ ] Junos `show configuration` (set-style and hierarchical)
-- [ ] Named-command hint flag (`--cmd "show ip route"`) to override detection
+## v0.4 — dialects (shipped)
+- [x] IOS-XR bgp summary (Spk column), NX-OS bgp summary sections
+- [x] EOS / Huawei VRP word-state bgp summary dialects
+- [x] NX-OS `show ip route` (ubest/mbest + *via format)
+- [x] Junos `show configuration` — set-style and hierarchical, one extractor
+- [x] `--kind` override (CLI flag, MCP tool arg, HTTP param) to skip auto-detection
+- [ ] XR `show bgp instance all` instance headers
+- [ ] NX-OS `show interface`, EOS-specific route table quirks
 
-## v0.4 — diff & drill-down
+## v0.5 — diff & drill-down
 - [ ] `netdistill diff before.txt after.txt` — what changed, LLM-friendly
 - [ ] `--section` drill-down (re-emit one elided table in full)
 - [ ] Real tokenizer-based counting behind a feature flag
 
-## v0.5 — hardening
+## v0.6 — hardening
 - [ ] Optional auth token for `serve` mode
 - [ ] Library crate API stabilization
 - [ ] ntc-templates corpus regression harness

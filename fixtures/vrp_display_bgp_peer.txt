@@ -1,0 +1,8 @@
+ BGP local router ID : 10.255.0.1
+ Local AS number : 64512
+ Total number of peers : 3                 Peers in established state : 2
+
+  Peer            V          AS  MsgRcvd  MsgSent  OutQ  Up/Down       State  PrefRcv
+  10.0.12.2       4       64513    12345    12360     0 5w4d    Established   184231
+  10.0.14.2       4        3356    93411    93400     0 6d21h   Established   210331
+  10.0.16.2       4       64515        0        0     0 00:00:07     Active        0

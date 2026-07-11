@@ -1,0 +1,22 @@
+set system host-name edge-osaka-1
+set system ntp server 192.168.100.10
+set system ntp server 192.168.100.11
+set system login user admin class super-user
+set system login user admin authentication encrypted-password "$6$REDACTED"
+set interfaces ge-0/0/0 description "uplink-to-core1"
+set interfaces ge-0/0/0 unit 0 family inet address 10.0.0.2/30
+set interfaces ge-0/0/1 description "uplink-to-core2"
+set interfaces ge-0/0/1 unit 0 family inet address 10.0.0.6/30
+set interfaces ge-0/0/2 disable
+set interfaces lo0 unit 0 family inet address 10.255.0.1/32
+set protocols bgp group TRANSIT type external
+set protocols bgp group TRANSIT neighbor 10.0.12.2 peer-as 64513
+set protocols bgp group TRANSIT neighbor 10.0.12.2 description "transit-a"
+set protocols bgp group TRANSIT neighbor 10.0.13.2 peer-as 7018
+set routing-instances CUST-A instance-type vrf
+set routing-instances CUST-A protocols bgp group CUST neighbor 10.50.0.1 peer-as 65100
+set routing-options static route 172.16.0.0/16 next-hop 10.0.0.9
+set policy-options policy-statement TRANSIT-IN term 1 from prefix-list DEFAULT-ONLY
+set policy-options policy-statement TRANSIT-IN term 1 then accept
+set policy-options prefix-list DEFAULT-ONLY 0.0.0.0/0
+set snmp community REDACTED authorization read-only

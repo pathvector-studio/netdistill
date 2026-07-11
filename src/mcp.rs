@@ -80,7 +80,16 @@ pub fn handle_message(line: &str) -> Option<String> {
                 .and_then(|v| v.as_u64())
                 .map(|v| v as usize);
             let as_json = args.get("format").and_then(|v| v.as_str()) == Some("json");
-            let out = crate::distill_to_string(input, full, budget, as_json);
+            let kind = match args.get("kind").and_then(|v| v.as_str()) {
+                Some(name) => match crate::detect::Kind::from_name(name) {
+                    Some(k) => Some(k),
+                    None => {
+                        return Some(error_response(id, -32602, &format!("unknown kind: {name}")))
+                    }
+                },
+                None => None,
+            };
+            let out = crate::distill_to_string(input, full, budget, as_json, kind);
             json!({"content": [{"type": "text", "text": out}], "isError": false})
         }
         _ => {
@@ -117,6 +126,11 @@ fn tool_spec() -> Value {
                     "type": "string",
                     "enum": ["text", "json"],
                     "description": "Output format (default text)"
+                },
+                "kind": {
+                    "type": "string",
+                    "enum": ["bgp-summary", "bgp-table", "route-table", "interfaces", "ospf-neighbors", "isis-neighbors", "lldp-neighbors", "config", "junos-config", "generic"],
+                    "description": "Force a specific parser instead of auto-detection"
                 }
             },
             "required": ["input"]

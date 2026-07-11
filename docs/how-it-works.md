@@ -70,7 +70,16 @@ The Junos RIB header check (`junos_rib_header`): split on `:` → name part cont
 
 ### bgp-summary (`parse/bgp_summary.rs`)
 
-**Dialect switching**: seeing a header with `InPkt`+`OutPkt` enables Junos mode; `Neighbor`+`MsgRcvd` enables IOS/FRR mode. It switches per header line — no upfront declaration.
+**Dialect switching** happens per header line — no upfront declaration:
+
+| header contains | mode | column semantics |
+|---|---|---|
+| `InPkt` + `OutPkt` | Junos | established peers show `a/b/c/d` counts |
+| `PfxAcc` | EOS | word state at col 8, PfxRcd at col 9 |
+| `PrefRcv` | Huawei VRP | word state at col 7, PrefRcv at col 8 |
+| `Neighbor` + `MsgRcvd` | IOS / IOS-XR / FRR / NX-OS | State/PfxRcd share col 9 (XR's `Spk` column lands in the same positions as IOS's `V`) |
+
+Banner variants for router-id/AS: `BGP router identifier X, local AS [number] Y` (IOS/XR/NX-OS), `Router identifier X` (EOS), `BGP local router ID :` / `Local AS number :` (VRP). NX-OS/EOS section headers (`BGP summary information for VRF ...`) become the section label.
 
 **Row admission**: only lines whose first token looks like an IP are peer rows. `is_addr` = contains `.` with only digits/dots (v4), or contains `:` with only hex/colon/dot (v6). FRR's dynamic-peer `*` prefix is stripped.
 
@@ -103,6 +112,8 @@ The Junos RIB header check (`junos_rib_header`): split on `:` → name part cont
 - Default route: detected both from `Gateway of last resort is <X>` (`not set` = absent) and from `0.0.0.0/0` / `::/0` entries.
 
 **Junos route lines**: first token is a prefix, second token is `*[Proto/pref]`; protocol comes from inside the bracket. Subsequent `> to <nh> via <if>` lines count next-hops, and if the preceding entry was the default route, its next-hop fixes `default_via`.
+
+**NX-OS** (`IP Route Table for VRF "x"`): the prefix line (`10.1.0.0/24, ubest/mbest: 2/0`) carries no protocol — it comes from the first `*via ..., ospf-1, intra` line, whose comma-separated fields are scanned for a known protocol token (`ospf-1` → ospf, `direct` → connected). ECMP: extra `*via` lines add next-hops but not routes.
 
 **Alerts**: tables with 0 routes; tables with hidden routes (Junos — policy-hidden routes are the first place to look during an incident).
 
@@ -154,6 +165,10 @@ Rows are ≥6-token lines whose 5th token is `UP`/`DOWN`/`INIT`. Non-UP adjacenc
 ### lldp-neighbors (`parse/lldp_neighbors.rs`)
 
 Inventory, not state: every row is unique information, so **nothing is elided** — the win is padding→tabs and dropping the hold-time column. One alert: if `Total entries displayed: N` disagrees with the parsed row count, the output may be truncated or an unrecognized dialect (honesty check on ourselves).
+
+### junos-config (`parse/juniper_config.rs`)
+
+Handles both `| display set` output and the native hierarchical braces style with **one extractor**: hierarchical input is first flattened into set-style statement paths by a brace walker (push block name on `{`, pop on `}`, emit stack+leaf on `;`), so every rule is written once against token paths like `["protocols","bgp","group",g,"neighbor",ip,"peer-as",as]`. A quote-aware tokenizer keeps `description "a b"` as one token. Secrets (`encrypted-password`, keys) are structurally discarded, same as the IOS config parser.
 
 ### generic (`parse/generic.rs`)
 
