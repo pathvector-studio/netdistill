@@ -28,6 +28,9 @@ struct Cli {
     /// isis-neighbors, lldp-neighbors, config, junos-config, generic)
     #[arg(long)]
     kind: Option<String>,
+    /// Drill down: emit only tables whose title contains this string, in full
+    #[arg(long)]
+    section: Option<String>,
 }
 
 #[derive(Subcommand)]
@@ -39,6 +42,10 @@ enum Cmd {
         /// Address to listen on
         #[arg(long, default_value = "127.0.0.1:8321")]
         listen: String,
+        /// Require this bearer token (Authorization header or ?token=).
+        /// Falls back to the NETDISTILL_TOKEN environment variable.
+        #[arg(long)]
+        token: Option<String>,
     },
     /// Diff two snapshots of the same command output; emit only what changed
     Diff {
@@ -46,6 +53,10 @@ enum Cmd {
         before: PathBuf,
         /// Later snapshot
         after: PathBuf,
+        /// Suppress rows changed only by counters/uptimes drifting less than
+        /// this many percent (0 = report everything)
+        #[arg(long, default_value_t = netdistill::diff::DEFAULT_DRIFT_PCT)]
+        drift: u32,
     },
 }
 
@@ -67,11 +78,18 @@ fn main() {
             netdistill::mcp::serve_stdio();
             return;
         }
-        Some(Cmd::Serve { listen }) => {
-            netdistill::http::serve(listen);
+        Some(Cmd::Serve { listen, token }) => {
+            let token = token
+                .clone()
+                .or_else(|| std::env::var("NETDISTILL_TOKEN").ok());
+            netdistill::http::serve(listen, token);
             return;
         }
-        Some(Cmd::Diff { before, after }) => {
+        Some(Cmd::Diff {
+            before,
+            after,
+            drift,
+        }) => {
             let read = |p: &PathBuf| {
                 std::fs::read_to_string(p).unwrap_or_else(|e| {
                     eprintln!("netdistill: cannot read {}: {e}", p.display());
@@ -82,12 +100,12 @@ fn main() {
             if cli.json {
                 println!(
                     "{}",
-                    netdistill::diff_to_string(&b, &a, cli.budget, true, kind)
+                    netdistill::diff_to_string(&b, &a, cli.budget, true, kind, *drift)
                 );
             } else {
                 print!(
                     "{}",
-                    netdistill::diff_to_string(&b, &a, cli.budget, false, kind)
+                    netdistill::diff_to_string(&b, &a, cli.budget, false, kind, *drift)
                 );
             }
             return;
@@ -95,7 +113,8 @@ fn main() {
         None => {}
     }
     let opts = Options {
-        full: cli.full,
+        // --section implies a full parse: the requested table must not be elided
+        full: cli.full || cli.section.is_some(),
         kind,
     };
     let mut docs = Vec::new();
@@ -137,6 +156,10 @@ fn main() {
                 }
             }
         }
+    }
+
+    if let Some(sec) = &cli.section {
+        netdistill::filter_section(&mut docs, sec);
     }
 
     if cli.json {

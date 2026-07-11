@@ -1,5 +1,9 @@
-use netdistill::http::route;
 use netdistill::mcp::handle_message;
+
+/// Unauthenticated shim matching the pre-token route signature.
+fn route(m: &str, p: &str, q: &str, c: &str, b: &str) -> (u16, String, String) {
+    netdistill::http::route(m, p, q, c, b, None, None)
+}
 
 fn fx(name: &str) -> String {
     std::fs::read_to_string(format!("fixtures/{name}")).unwrap()

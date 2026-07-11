@@ -88,6 +88,8 @@ netdistill --budget 800 session.log    # trim tables to fit ~800 tokens
 netdistill --json show_bgp.txt         # structured JSON for pipelines
 netdistill --kind route-table dump.txt # force a parser, skip auto-detection
 netdistill diff before.txt after.txt   # only what changed between snapshots
+netdistill diff a.txt b.txt --drift 0  # report even tiny counter drift
+netdistill --section next-hops r1.txt  # re-emit one elided table in full
 ```
 
 Typical agent/pipeline use: run the command, pipe through `netdistill`, hand the digest to the model. If the model needs detail that was elided, re-run with `--full` for just that command — the elision notes tell it exactly what to ask for.
@@ -95,6 +97,16 @@ Typical agent/pipeline use: run the command, pipe through `netdistill`, hand the
 ### Diff mode
 
 `netdistill diff before.txt after.txt` compares two snapshots of the same command and emits **only what changed**: `NEW:`/`RESOLVED:` alerts, changed summary values as `old → new`, and per-row `Δ` tables (`+` added, `-` removed, `~` changed with cell-level `old→new`). Two identical healthy snapshots collapse to `no changes detected` — the cheapest possible answer to "did the maintenance break anything?". Both sides are parsed unelided internally, so a change in a previously-healthy entry is never missed. Also available as the `diff` MCP tool and `POST /v1/diff`.
+
+Counter noise is damped by default: rows whose only changes are uptime ticks or numeric drift below 10% are suppressed (with an explicit note), and alerts that differ only in timestamps don't flap as NEW/RESOLVED pairs. Tune with `--drift <pct>`, disable with `--drift 0`.
+
+### Drill-down
+
+When a digest says "495 rows omitted", `--section <name>` re-emits just that table, unelided: `netdistill --section "next-hops" routes.txt`. Matching is case-insensitive substring on table titles; a miss lists the available titles. Also an MCP `distill` argument and `?section=` on the HTTP API — an agent can read the digest first and drill into exactly one table instead of re-reading everything.
+
+### Serve auth
+
+`netdistill serve --token <secret>` (or the `NETDISTILL_TOKEN` env var) requires `Authorization: Bearer <secret>` or `?token=` on every endpoint except `/healthz`. Without a token configured, serve remains open — keep it on localhost.
 
 ## Integrations
 

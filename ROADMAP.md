@@ -28,15 +28,16 @@
 - [x] `netdistill diff before.txt after.txt` — NEW/RESOLVED alerts, Δ tables, cell-level old→new
 - [x] `diff` exposed as MCP tool and `POST /v1/diff`
 
-## next
-- [ ] `--section` drill-down (re-emit one elided table in full)
-- [ ] Real tokenizer-based counting behind a feature flag
-- [ ] Numeric-drift damping in diff (ignore counter columns below a change threshold)
+## v0.6 — drill-down & hardening (shipped)
+- [x] `--section` drill-down (re-emit one elided table in full; CLI/MCP/HTTP)
+- [x] Numeric/uptime drift damping in diff (`--drift`, default 10%; timestamp-only alerts don't flap)
+- [x] Optional auth token for `serve` mode (`--token` / NETDISTILL_TOKEN; /healthz stays open)
 
-## v0.6 — hardening
-- [ ] Optional auth token for `serve` mode
+## next
+- [ ] Real tokenizer-based counting behind a feature flag
 - [ ] Library crate API stabilization
 - [ ] ntc-templates corpus regression harness
+- [ ] XR `show bgp instance all`, NX-OS `show interface`
 
 ## Positioning notes
 - TextFSM / ntc-templates / Genie parse to *structure*; their JSON is often **bigger** than the raw text. The gap netdistill fills is the layer after parsing: aggregation, anomaly ranking, and explicit elision under a token budget.

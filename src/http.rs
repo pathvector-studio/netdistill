@@ -16,19 +16,24 @@ POST /v1/diff       JSON body: {\"before\": \"...\", \"after\": \"...\", \"budge
                     returns only what changed between two snapshots\n\
 GET  /healthz       liveness + version\n";
 
-pub fn serve(listen: &str) {
+pub fn serve(listen: &str, token: Option<String>) {
     let server = Server::http(listen).unwrap_or_else(|e| {
         eprintln!("netdistill: cannot bind {listen}: {e}");
         std::process::exit(1);
     });
-    eprintln!("netdistill API listening on http://{listen}  (POST /v1/distill; GET / for usage)");
+    eprintln!(
+        "netdistill API listening on http://{listen}  (POST /v1/distill; GET / for usage; auth: {})",
+        if token.is_some() { "bearer token required" } else { "none" }
+    );
     let server = std::sync::Arc::new(server);
+    let token = std::sync::Arc::new(token);
     let mut handles = Vec::new();
     for _ in 0..4 {
         let s = server.clone();
+        let t = token.clone();
         handles.push(std::thread::spawn(move || {
             while let Ok(req) = s.recv() {
-                handle(req);
+                handle(req, t.as_deref());
             }
         }));
     }
@@ -37,7 +42,7 @@ pub fn serve(listen: &str) {
     }
 }
 
-fn handle(mut req: tiny_http::Request) {
+fn handle(mut req: tiny_http::Request, expected_token: Option<&str>) {
     let method = req.method().to_string().to_uppercase();
     let url = req.url().to_string();
     let (path, query) = match url.split_once('?') {
@@ -50,10 +55,28 @@ fn handle(mut req: tiny_http::Request) {
         .find(|h| h.field.equiv("content-type"))
         .map(|h| h.value.as_str().to_string())
         .unwrap_or_default();
+    let auth = req
+        .headers()
+        .iter()
+        .find(|h| h.field.equiv("authorization"))
+        .map(|h| h.value.as_str().to_string());
+    let provided = auth
+        .as_deref()
+        .and_then(|a| a.strip_prefix("Bearer "))
+        .map(str::to_string)
+        .or_else(|| qparam(&query, "token").map(str::to_string));
     let mut body = String::new();
     let _ = req.as_reader().read_to_string(&mut body);
 
-    let (status, out_type, out) = route(&method, &path, &query, &ctype, &body);
+    let (status, out_type, out) = route(
+        &method,
+        &path,
+        &query,
+        &ctype,
+        &body,
+        expected_token,
+        provided.as_deref(),
+    );
     let header = Header::from_bytes(&b"Content-Type"[..], out_type.as_bytes())
         .expect("static content-type header");
     let _ = req.respond(
@@ -70,7 +93,20 @@ pub fn route(
     query: &str,
     content_type: &str,
     body: &str,
+    expected_token: Option<&str>,
+    provided_token: Option<&str>,
 ) -> (u16, String, String) {
+    // /healthz stays open for liveness probes; everything else needs the token.
+    if let Some(expected) = expected_token {
+        if path != "/healthz" && provided_token != Some(expected) {
+            return (
+                401,
+                "application/json".into(),
+                json!({"error": "unauthorized: pass Authorization: Bearer <token> or ?token="})
+                    .to_string(),
+            );
+        }
+    }
     match (method, path) {
         ("GET", "/healthz") => (
             200,
@@ -79,7 +115,7 @@ pub fn route(
         ),
         ("GET", "/") => (200, "text/plain; charset=utf-8".into(), USAGE.to_string()),
         ("POST", "/v1/distill") => {
-            let (input, full, budget, as_json, kind_name) =
+            let (input, full, budget, as_json, kind_name, section) =
                 if content_type.contains("application/json") {
                     let v: serde_json::Value = match serde_json::from_str(body) {
                         Ok(v) => v,
@@ -95,6 +131,9 @@ pub fn route(
                         v.get("budget").and_then(|b| b.as_u64()).map(|b| b as usize),
                         v.get("format").and_then(|f| f.as_str()) == Some("json"),
                         v.get("kind").and_then(|k| k.as_str()).map(str::to_string),
+                        v.get("section")
+                            .and_then(|s| s.as_str())
+                            .map(str::to_string),
                     )
                 } else {
                     if body.is_empty() {
@@ -106,6 +145,7 @@ pub fn route(
                         qparam(query, "budget").and_then(|b| b.parse().ok()),
                         qparam(query, "format") == Some("json"),
                         qparam(query, "kind").map(str::to_string),
+                        qparam(query, "section").map(str::to_string),
                     )
                 };
             let kind = match kind_name.as_deref() {
@@ -115,7 +155,8 @@ pub fn route(
                 },
                 None => None,
             };
-            let out = crate::distill_to_string(&input, full, budget, as_json, kind);
+            let out =
+                crate::distill_to_string(&input, full, budget, as_json, kind, section.as_deref());
             let out_type = if as_json {
                 "application/json"
             } else {
@@ -141,6 +182,11 @@ pub fn route(
             };
             let as_json = v.get("format").and_then(|f| f.as_str()) == Some("json");
             let budget = v.get("budget").and_then(|b| b.as_u64()).map(|b| b as usize);
+            let drift = v
+                .get("drift")
+                .and_then(|d| d.as_u64())
+                .map(|d| d as u32)
+                .unwrap_or(crate::diff::DEFAULT_DRIFT_PCT);
             let kind = match v.get("kind").and_then(|k| k.as_str()) {
                 Some(name) => match crate::detect::Kind::from_name(name) {
                     Some(k) => Some(k),
@@ -148,7 +194,7 @@ pub fn route(
                 },
                 None => None,
             };
-            let out = crate::diff_to_string(before, after, budget, as_json, kind);
+            let out = crate::diff_to_string(before, after, budget, as_json, kind, drift);
             let out_type = if as_json {
                 "application/json"
             } else {

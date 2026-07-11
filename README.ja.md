@@ -67,6 +67,8 @@ netdistill --budget 800 session.log    # 約800トークンに収まるよう表
 netdistill --json show_bgp.txt         # パイプライン向け JSON
 netdistill --kind route-table dump.txt # 自動判定を使わずパーサを強制指定
 netdistill diff before.txt after.txt   # 2スナップショット間の変化だけ出す
+netdistill diff a.txt b.txt --drift 0  # 微小なカウンタ変動も報告する
+netdistill --section next-hops r1.txt  # 省略された表を1つだけ完全展開
 ```
 
 エージェント/パイプラインでの典型: コマンド実行 → `netdistill` に通す → ダイジェストをモデルへ。省略された詳細が必要になったら、そのコマンドだけ `--full` で再実行。省略ノートが「何を再要求すべきか」をモデルに教えます。
@@ -74,6 +76,16 @@ netdistill diff before.txt after.txt   # 2スナップショット間の変化�
 ### diff モード
 
 `netdistill diff before.txt after.txt` は同一コマンドの2スナップショットを比較し、**変わったところだけ**を出します: `NEW:`/`RESOLVED:` のアラート、`old → new` 形式のサマリ変化、行単位の `Δ` 表（`+` 追加 / `-` 削除 / `~` 変更、セル単位で `old→new`）。同一の健全なスナップショット同士なら `no changes detected` の一行に畳まれます — 「メンテで何か壊れた？」への最安の回答です。内部では両側を省略なしでパースするので、普段は省略される healthy なエントリの変化も見逃しません。MCP の `diff` ツールと `POST /v1/diff` でも使えます。
+
+カウンタノイズは既定で抑制されます: uptime の進行や 10% 未満の数値変動しかない行は（明示ノート付きで）省かれ、タイムスタンプだけが違うアラートは NEW/RESOLVED のペアとしてバタつきません。`--drift <pct>` で調整、`--drift 0` で全報告。
+
+### ドリルダウン
+
+ダイジェストに「495行省略」と出たら、`--section <名前>` でその表だけを省略なしで再出力できます: `netdistill --section "next-hops" routes.txt`。表タイトルの部分一致（大文字小文字無視）で、ヒットしなければ利用可能なタイトル一覧を返します。MCP `distill` の引数と HTTP の `?section=` でも使えるので、エージェントは「まずダイジェスト → 必要な表だけ掘る」という2段階読みができます。
+
+### serve の認証
+
+`netdistill serve --token <secret>`（または環境変数 `NETDISTILL_TOKEN`）で、`/healthz` 以外の全エンドポイントに `Authorization: Bearer <secret>` か `?token=` を要求します。トークン未設定なら従来通りオープン — その場合は localhost に留めてください。
 
 ## 組み込み方法
 

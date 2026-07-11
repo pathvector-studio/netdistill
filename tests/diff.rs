@@ -120,12 +120,12 @@ fn http_diff_endpoint() {
     let after = before.replace("Total output drops: 18233", "Total output drops: 55555");
     let env = serde_json::json!({"before": before, "after": after}).to_string();
     let (status, _, out) =
-        netdistill::http::route("POST", "/v1/diff", "", "application/json", &env);
+        netdistill::http::route("POST", "/v1/diff", "", "application/json", &env, None, None);
     assert_eq!(status, 200, "{out}");
     assert!(out.contains("18233→55555"), "{out}");
 
     let (status, _, out) =
-        netdistill::http::route("POST", "/v1/diff", "", "application/json", "{}");
+        netdistill::http::route("POST", "/v1/diff", "", "application/json", "{}", None, None);
     assert_eq!(status, 400, "{out}");
 }
 

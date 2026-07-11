@@ -30,21 +30,51 @@ pub struct Options {
 
 /// Diff two snapshots of the same command output and render only the changes.
 /// Both sides are parsed with `full: true` so changes in normally-elided
-/// (healthy) entries are still caught.
+/// (healthy) entries are still caught. `drift_pct` damps counter/uptime noise
+/// (0 disables damping).
 pub fn diff_to_string(
     before: &str,
     after: &str,
     budget: Option<usize>,
     json: bool,
     kind: Option<Kind>,
+    drift_pct: u32,
 ) -> String {
     let opts = Options { full: true, kind };
-    let docs = diff::diff_docs(distill(before, &opts), distill(after, &opts));
+    let docs = diff::diff_docs_with(distill(before, &opts), distill(after, &opts), drift_pct);
     let in_tok = token::estimate(before) + token::estimate(after);
     if json {
         render::render_json(&docs, in_tok)
     } else {
         render::render_text(docs, in_tok, budget)
+    }
+}
+
+/// Drill-down: keep only tables whose title contains `section`
+/// (case-insensitive), dropping alerts/summary/notes. If nothing matches, a
+/// stub doc lists the available table titles.
+pub fn filter_section(docs: &mut Vec<Doc>, section: &str) {
+    let needle = section.to_lowercase();
+    let mut available: Vec<String> = Vec::new();
+    for d in docs.iter_mut() {
+        available.extend(d.tables.iter().map(|t| t.title.clone()));
+        d.tables
+            .retain(|t| t.title.to_lowercase().contains(&needle));
+        d.alerts.clear();
+        d.summary.clear();
+        d.notes.clear();
+        d.body = None;
+    }
+    docs.retain(|d| !d.tables.is_empty());
+    if docs.is_empty() {
+        let mut d = Doc::new("section", format!("no table matching '{section}'"));
+        if available.is_empty() {
+            d.notes.push("input produced no tables".into());
+        } else {
+            d.notes
+                .push(format!("available tables: {}", available.join(", ")));
+        }
+        docs.push(d);
     }
 }
 
@@ -56,9 +86,21 @@ pub fn distill_to_string(
     budget: Option<usize>,
     json: bool,
     kind: Option<Kind>,
+    section: Option<&str>,
 ) -> String {
     let in_tok = token::estimate(input);
-    let docs = distill(input, &Options { full, kind });
+    // Drill-down implies a full parse: the requested table must not be elided.
+    let eff_full = full || section.is_some();
+    let mut docs = distill(
+        input,
+        &Options {
+            full: eff_full,
+            kind,
+        },
+    );
+    if let Some(sec) = section {
+        filter_section(&mut docs, sec);
+    }
     if json {
         render::render_json(&docs, in_tok)
     } else {

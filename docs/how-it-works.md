@@ -224,7 +224,7 @@ Both servers are thin wrappers over the same `distill_to_string(input, full, bud
 - Sections that exist on only one side (kind mismatch, added/removed commands in a session log) are flagged as alerts.
 - Zero changes → a single `no changes detected` summary line.
 
-Because the diff operates on distilled structure, counter noise is already reduced (the digest doesn't carry MsgRcvd etc.), but naturally-drifting columns (prefix counts, uptimes) will still show as `~` rows — the standing note warns the LLM about this. Threshold-based damping is on the roadmap.
+**Drift damping** (default 10%, `--drift`): a changed cell is *drift* if both values are pure time formats (`5w4d`, `00:00:31`, `never`) or both are numbers differing by less than the threshold. A `~` row whose every changed cell is drift is suppressed and counted in the table note; any non-drift change keeps the whole row (with all its old→new cells, drift included, for context). Alerts are compared with time tokens masked, so an alert whose only difference is a timestamp ("up only 00:42:11" → "00:55:02") counts as carried, not as a NEW/RESOLVED flap. `--drift 0` reports everything.
 
 ## Where the compression comes from
 

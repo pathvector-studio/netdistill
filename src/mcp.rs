@@ -88,7 +88,8 @@ pub fn handle_message(line: &str) -> Option<String> {
                         ));
                     };
                     let full = args.get("full").and_then(|v| v.as_bool()).unwrap_or(false);
-                    crate::distill_to_string(input, full, budget, as_json, kind)
+                    let section = args.get("section").and_then(|v| v.as_str());
+                    crate::distill_to_string(input, full, budget, as_json, kind, section)
                 }
                 "diff" => {
                     let (Some(before), Some(after)) = (
@@ -101,7 +102,12 @@ pub fn handle_message(line: &str) -> Option<String> {
                             "missing required arguments: before, after",
                         ));
                     };
-                    crate::diff_to_string(before, after, budget, as_json, kind)
+                    let drift = args
+                        .get("drift")
+                        .and_then(|v| v.as_u64())
+                        .map(|v| v as u32)
+                        .unwrap_or(crate::diff::DEFAULT_DRIFT_PCT);
+                    crate::diff_to_string(before, after, budget, as_json, kind, drift)
                 }
                 _ => return Some(error_response(id, -32602, &format!("unknown tool: {name}"))),
             };
@@ -129,7 +135,8 @@ fn diff_spec() -> Value {
                 "after": {"type": "string", "description": "Later snapshot of the same command"},
                 "budget": {"type": "integer", "description": "Approximate output token budget"},
                 "format": {"type": "string", "enum": ["text", "json"], "description": "Output format (default text)"},
-                "kind": {"type": "string", "description": "Force a specific parser instead of auto-detection"}
+                "kind": {"type": "string", "description": "Force a specific parser instead of auto-detection"},
+                "drift": {"type": "integer", "description": "Suppress rows changed only by counters/uptimes drifting less than this percent (default 10; 0 = report everything)"}
             },
             "required": ["before", "after"]
         }
@@ -164,6 +171,10 @@ fn distill_spec() -> Value {
                     "type": "string",
                     "enum": ["bgp-summary", "bgp-table", "route-table", "interfaces", "ospf-neighbors", "isis-neighbors", "lldp-neighbors", "config", "junos-config", "generic"],
                     "description": "Force a specific parser instead of auto-detection"
+                },
+                "section": {
+                    "type": "string",
+                    "description": "Drill down: return only tables whose title contains this string, unelided (e.g. after a digest said rows were omitted)"
                 }
             },
             "required": ["input"]
