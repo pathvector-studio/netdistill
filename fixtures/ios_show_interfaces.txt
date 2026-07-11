@@ -1,0 +1,63 @@
+GigabitEthernet0/0 is up, line protocol is up
+  Hardware is iGbE, address is 0c11.6783.0001 (bia 0c11.6783.0001)
+  Description: uplink-to-core1
+  Internet address is 10.0.0.2/30
+  MTU 1500 bytes, BW 1000000 Kbit/sec, DLY 10 usec,
+     reliability 255/255, txload 12/255, rxload 34/255
+  Input queue: 0/75/0/0 (size/max/drops/flushes); Total output drops: 0
+  5 minute input rate 134217000 bits/sec, 22100 packets/sec
+  5 minute output rate 52000000 bits/sec, 9800 packets/sec
+     882134411 packets input, 1029341123441 bytes, 0 no buffer
+     0 input errors, 0 CRC, 0 frame, 0 overrun, 0 ignored
+     441022311 packets output, 512334112233 bytes, 0 underruns
+     0 output errors, 0 collisions, 1 interface resets
+GigabitEthernet0/1 is up, line protocol is up
+  Hardware is iGbE, address is 0c11.6783.0002 (bia 0c11.6783.0002)
+  Description: uplink-to-core2
+  Internet address is 10.0.0.6/30
+  MTU 1500 bytes, BW 1000000 Kbit/sec, DLY 10 usec,
+     reliability 254/255, txload 8/255, rxload 21/255
+  Input queue: 0/75/0/0 (size/max/drops/flushes); Total output drops: 18233
+  5 minute input rate 91000000 bits/sec, 15400 packets/sec
+  5 minute output rate 40100000 bits/sec, 7200 packets/sec
+     512334411 packets input, 812341123441 bytes, 0 no buffer
+     14411 input errors, 14200 CRC, 0 frame, 0 overrun, 0 ignored
+     341022311 packets output, 412334112233 bytes, 0 underruns
+     0 output errors, 0 collisions, 3 interface resets
+GigabitEthernet0/2 is down, line protocol is down
+  Hardware is iGbE, address is 0c11.6783.0003 (bia 0c11.6783.0003)
+  Description: cust-a-handoff
+  Internet address is 10.50.0.2/30
+  MTU 1500 bytes, BW 1000000 Kbit/sec, DLY 10 usec,
+     reliability 255/255, txload 1/255, rxload 1/255
+  Input queue: 0/75/0/0 (size/max/drops/flushes); Total output drops: 0
+  5 minute input rate 0 bits/sec, 0 packets/sec
+  5 minute output rate 0 bits/sec, 0 packets/sec
+     11234 packets input, 9341123 bytes, 0 no buffer
+     0 input errors, 0 CRC, 0 frame, 0 overrun, 0 ignored
+     11022 packets output, 8334112 bytes, 0 underruns
+     0 output errors, 0 collisions, 0 interface resets
+GigabitEthernet0/3 is administratively down, line protocol is down
+  Hardware is iGbE, address is 0c11.6783.0004 (bia 0c11.6783.0004)
+  MTU 1500 bytes, BW 1000000 Kbit/sec, DLY 10 usec,
+     reliability 255/255, txload 1/255, rxload 1/255
+  Input queue: 0/75/0/0 (size/max/drops/flushes); Total output drops: 0
+  5 minute input rate 0 bits/sec, 0 packets/sec
+  5 minute output rate 0 bits/sec, 0 packets/sec
+     0 packets input, 0 bytes, 0 no buffer
+     0 input errors, 0 CRC, 0 frame, 0 overrun, 0 ignored
+     0 packets output, 0 bytes, 0 underruns
+     0 output errors, 0 collisions, 0 interface resets
+Loopback0 is up, line protocol is up
+  Hardware is Loopback
+  Description: router-id
+  Internet address is 10.255.0.1/32
+  MTU 1514 bytes, BW 8000000 Kbit/sec, DLY 5000 usec,
+     reliability 255/255, txload 1/255, rxload 1/255
+  Input queue: 0/75/0/0 (size/max/drops/flushes); Total output drops: 0
+  5 minute input rate 0 bits/sec, 0 packets/sec
+  5 minute output rate 0 bits/sec, 0 packets/sec
+     0 packets input, 0 bytes, 0 no buffer
+     0 input errors, 0 CRC, 0 frame, 0 overrun, 0 ignored
+     0 packets output, 0 bytes, 0 underruns
+     0 output errors, 0 collisions, 0 interface resets

@@ -1,0 +1,11 @@
+Groups: 3 Peers: 4 Down peers: 1
+Table          Tot Paths  Act Paths Suppressed    History Damp State    Pending
+inet.0            734212     512344          0          0          0          0
+inet6.0           190211     182344          0          0          0          0
+Peer                     AS      InPkt     OutPkt    OutQ   Flaps Last Up/Dwn State|#Active/Received/Accepted/Damped
+10.20.0.1             64520     812344     812001       0       1 12w4d 2:03:11 512344/734212/734212/0
+10.20.0.5             64521      12344      12388       0       4 1d 4:22:03 Establ
+  inet.0: 1822/1830/1830/0
+10.20.0.9             64522          0          0       0       9 2w0d 1:00:00 Active
+2001:db8:20::1        64520     799001     798700       0       0 12w4d 2:03:11 Establ
+  inet6.0: 182344/190211/190211/0

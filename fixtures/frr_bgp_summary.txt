@@ -1,0 +1,16 @@
+BGP router identifier 10.255.0.1, local AS number 64512 vrf-id 0
+BGP table version 812734
+RIB entries 245812, using 45 MiB of memory
+Peers 8, using 190 KiB of memory
+
+Neighbor        V         AS   MsgRcvd   MsgSent   TblVer  InQ OutQ  Up/Down State/PfxRcd   PfxSnt Desc
+10.0.12.2       4      64513    182341    182350   812734    0    0 5w4d           184231      512 transit-a
+10.0.13.2       4       7018   1023441   1023001   812734    0    0 2w0d           912344      512 att-transit
+10.0.14.2       4       3356     93411     93400   812734    0    0 6d21h          210331      512 lumen
+10.0.15.2       4      64514      1211      1209   812734    0    0 00:42:11            0      512 ix-peer-1
+10.0.16.2       4      64515         0         0        0    0    0 never    Active               ix-peer-2
+10.0.17.2       4      64516        42        40        0    0    0 1d03h    Idle (Admin)         maintenance
+2001:db8:12::2  4      64513    172001    172200   812734    0    0 5w4d           102311      256 transit-a-v6
+2001:db8:14::2  4       3356     81222     81100   812734    0    0 6d21h           48211      256 lumen-v6
+
+Total number of neighbors 8

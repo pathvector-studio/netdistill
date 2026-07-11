@@ -1,0 +1,108 @@
+!
+version 17.3
+service timestamps debug datetime msec
+service timestamps log datetime msec
+service password-encryption
+!
+hostname edge-tokyo-1
+!
+boot-start-marker
+boot-end-marker
+!
+aaa new-model
+aaa authentication login default group tacacs+ local
+!
+username admin privilege 15 secret 9 $9$REDACTED
+username netops privilege 15 secret 9 $9$REDACTED
+!
+vrf definition MGMT
+ rd 65000:100
+ address-family ipv4
+ exit-address-family
+!
+vrf definition CUST-A
+ rd 65000:200
+ route-target export 65000:200
+ route-target import 65000:200
+ address-family ipv4
+ exit-address-family
+!
+ip domain name example.net
+!
+interface Loopback0
+ description router-id
+ ip address 10.255.0.1 255.255.255.255
+!
+interface GigabitEthernet0/0
+ description uplink-to-core1
+ ip address 10.0.0.2 255.255.255.252
+ ip ospf network point-to-point
+!
+interface GigabitEthernet0/1
+ description uplink-to-core2
+ ip address 10.0.0.6 255.255.255.252
+ ip ospf network point-to-point
+!
+interface GigabitEthernet0/2
+ description cust-a-handoff
+ vrf forwarding CUST-A
+ ip address 10.50.0.2 255.255.255.252
+!
+interface GigabitEthernet0/3
+ shutdown
+!
+interface GigabitEthernet0/4
+!
+interface Vlan100
+ description mgmt
+ vrf forwarding MGMT
+ ip address 192.168.100.1 255.255.255.0
+!
+router ospf 1
+ router-id 10.255.0.1
+ network 10.0.0.0 0.0.255.255 area 0
+!
+router bgp 64512
+ bgp router-id 10.255.0.1
+ bgp log-neighbor-changes
+ neighbor TRANSIT peer-group
+ neighbor TRANSIT ebgp-multihop 2
+ neighbor 10.0.12.2 remote-as 64513
+ neighbor 10.0.12.2 description transit-a
+ neighbor 10.0.13.2 remote-as 7018
+ neighbor 10.0.13.2 description att-transit
+ neighbor 10.0.13.2 peer-group TRANSIT
+ address-family ipv4
+  neighbor 10.0.12.2 activate
+  neighbor 10.0.13.2 activate
+  neighbor 10.0.12.2 route-map TRANSIT-IN in
+ exit-address-family
+ address-family vpnv4
+ exit-address-family
+!
+ip route 172.16.0.0 255.255.0.0 10.0.0.9
+ip route vrf MGMT 0.0.0.0 0.0.0.0 192.168.100.254
+!
+ip access-list extended MGMT-ACCESS
+ permit tcp 192.168.100.0 0.0.0.255 any eq 22
+ deny ip any any log
+!
+ip prefix-list DEFAULT-ONLY seq 5 permit 0.0.0.0/0
+ip prefix-list CUST-A-IN seq 5 permit 10.51.0.0/24
+ip prefix-list CUST-A-IN seq 10 permit 10.52.0.0/24
+!
+route-map TRANSIT-IN permit 10
+ match ip address prefix-list DEFAULT-ONLY
+ set local-preference 200
+route-map TRANSIT-IN deny 20
+!
+snmp-server community REDACTED RO
+logging host 192.168.100.50
+logging host 192.168.100.51
+ntp server 192.168.100.10
+ntp server 192.168.100.11
+!
+line vty 0 4
+ transport input ssh
+!
+end
