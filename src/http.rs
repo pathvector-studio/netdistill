@@ -12,6 +12,8 @@ const USAGE: &str = "netdistill HTTP API\n\
 POST /v1/distill    body = raw CLI output (text/plain)\n\
                     query: ?full=1  ?budget=800  ?format=json  ?kind=<parser>\n\
                     or JSON body: {\"input\": \"...\", \"full\": false, \"budget\": 800, \"format\": \"text\"|\"json\", \"kind\": \"...\"}\n\
+POST /v1/diff       JSON body: {\"before\": \"...\", \"after\": \"...\", \"budget\": 800, \"format\": \"text\"|\"json\", \"kind\": \"...\"}\n\
+                    returns only what changed between two snapshots\n\
 GET  /healthz       liveness + version\n";
 
 pub fn serve(listen: &str) {
@@ -114,6 +116,39 @@ pub fn route(
                 None => None,
             };
             let out = crate::distill_to_string(&input, full, budget, as_json, kind);
+            let out_type = if as_json {
+                "application/json"
+            } else {
+                "text/plain; charset=utf-8"
+            };
+            (200, out_type.into(), out)
+        }
+        ("POST", "/v1/diff") => {
+            if !content_type.contains("application/json") {
+                return bad_request(
+                    "POST /v1/diff takes a JSON body: {\"before\": \"...\", \"after\": \"...\"}",
+                );
+            }
+            let v: serde_json::Value = match serde_json::from_str(body) {
+                Ok(v) => v,
+                Err(e) => return bad_request(&format!("invalid JSON body: {e}")),
+            };
+            let (Some(before), Some(after)) = (
+                v.get("before").and_then(|x| x.as_str()),
+                v.get("after").and_then(|x| x.as_str()),
+            ) else {
+                return bad_request("missing required fields: before, after");
+            };
+            let as_json = v.get("format").and_then(|f| f.as_str()) == Some("json");
+            let budget = v.get("budget").and_then(|b| b.as_u64()).map(|b| b as usize);
+            let kind = match v.get("kind").and_then(|k| k.as_str()) {
+                Some(name) => match crate::detect::Kind::from_name(name) {
+                    Some(k) => Some(k),
+                    None => return bad_request(&format!("unknown kind: {name}")),
+                },
+                None => None,
+            };
+            let out = crate::diff_to_string(before, after, budget, as_json, kind);
             let out_type = if as_json {
                 "application/json"
             } else {

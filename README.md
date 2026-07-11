@@ -87,9 +87,14 @@ netdistill --full show_bgp.txt         # keep every row (still restructured)
 netdistill --budget 800 session.log    # trim tables to fit ~800 tokens
 netdistill --json show_bgp.txt         # structured JSON for pipelines
 netdistill --kind route-table dump.txt # force a parser, skip auto-detection
+netdistill diff before.txt after.txt   # only what changed between snapshots
 ```
 
 Typical agent/pipeline use: run the command, pipe through `netdistill`, hand the digest to the model. If the model needs detail that was elided, re-run with `--full` for just that command — the elision notes tell it exactly what to ask for.
+
+### Diff mode
+
+`netdistill diff before.txt after.txt` compares two snapshots of the same command and emits **only what changed**: `NEW:`/`RESOLVED:` alerts, changed summary values as `old → new`, and per-row `Δ` tables (`+` added, `-` removed, `~` changed with cell-level `old→new`). Two identical healthy snapshots collapse to `no changes detected` — the cheapest possible answer to "did the maintenance break anything?". Both sides are parsed unelided internally, so a change in a previously-healthy entry is never missed. Also available as the `diff` MCP tool and `POST /v1/diff`.
 
 ## Integrations
 

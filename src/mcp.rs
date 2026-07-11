@@ -54,27 +54,16 @@ pub fn handle_message(line: &str) -> Option<String> {
             })
         }
         "ping" => json!({}),
-        "tools/list" => json!({"tools": [tool_spec()]}),
+        "tools/list" => json!({"tools": [distill_spec(), diff_spec()]}),
         "tools/call" => {
             let name = msg
                 .pointer("/params/name")
                 .and_then(|v| v.as_str())
                 .unwrap_or("");
-            if name != "distill" {
-                return Some(error_response(id, -32602, &format!("unknown tool: {name}")));
-            }
             let args = msg
                 .pointer("/params/arguments")
                 .cloned()
                 .unwrap_or_else(|| json!({}));
-            let Some(input) = args.get("input").and_then(|v| v.as_str()) else {
-                return Some(error_response(
-                    id,
-                    -32602,
-                    "missing required argument: input",
-                ));
-            };
-            let full = args.get("full").and_then(|v| v.as_bool()).unwrap_or(false);
             let budget = args
                 .get("budget")
                 .and_then(|v| v.as_u64())
@@ -89,7 +78,33 @@ pub fn handle_message(line: &str) -> Option<String> {
                 },
                 None => None,
             };
-            let out = crate::distill_to_string(input, full, budget, as_json, kind);
+            let out = match name {
+                "distill" => {
+                    let Some(input) = args.get("input").and_then(|v| v.as_str()) else {
+                        return Some(error_response(
+                            id,
+                            -32602,
+                            "missing required argument: input",
+                        ));
+                    };
+                    let full = args.get("full").and_then(|v| v.as_bool()).unwrap_or(false);
+                    crate::distill_to_string(input, full, budget, as_json, kind)
+                }
+                "diff" => {
+                    let (Some(before), Some(after)) = (
+                        args.get("before").and_then(|v| v.as_str()),
+                        args.get("after").and_then(|v| v.as_str()),
+                    ) else {
+                        return Some(error_response(
+                            id,
+                            -32602,
+                            "missing required arguments: before, after",
+                        ));
+                    };
+                    crate::diff_to_string(before, after, budget, as_json, kind)
+                }
+                _ => return Some(error_response(id, -32602, &format!("unknown tool: {name}"))),
+            };
             json!({"content": [{"type": "text", "text": out}], "isError": false})
         }
         _ => {
@@ -103,7 +118,25 @@ pub fn handle_message(line: &str) -> Option<String> {
     Some(json!({"jsonrpc": "2.0", "id": id, "result": result}).to_string())
 }
 
-fn tool_spec() -> Value {
+fn diff_spec() -> Value {
+    json!({
+        "name": "diff",
+        "description": "Diff two snapshots of the same network command output (or config) and return only what changed: new/resolved alerts, added/removed/changed entries. Two healthy identical snapshots collapse to 'no changes detected'. Use for before/after comparisons around maintenance or incidents.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "before": {"type": "string", "description": "Earlier snapshot (raw CLI output or config)"},
+                "after": {"type": "string", "description": "Later snapshot of the same command"},
+                "budget": {"type": "integer", "description": "Approximate output token budget"},
+                "format": {"type": "string", "enum": ["text", "json"], "description": "Output format (default text)"},
+                "kind": {"type": "string", "description": "Force a specific parser instead of auto-detection"}
+            },
+            "required": ["before", "after"]
+        }
+    })
+}
+
+fn distill_spec() -> Value {
     json!({
         "name": "distill",
         "description": "Distill network CLI output (show commands, configs, whole terminal session logs) into a compact LLM-friendly digest: anomalies first, aggregates instead of dumps, explicit elision notes. Typically reduces tokens by 90-99%. Use this before reading any large router/switch output.",

@@ -40,6 +40,13 @@ enum Cmd {
         #[arg(long, default_value = "127.0.0.1:8321")]
         listen: String,
     },
+    /// Diff two snapshots of the same command output; emit only what changed
+    Diff {
+        /// Earlier snapshot
+        before: PathBuf,
+        /// Later snapshot
+        after: PathBuf,
+    },
 }
 
 fn main() {
@@ -62,6 +69,27 @@ fn main() {
         }
         Some(Cmd::Serve { listen }) => {
             netdistill::http::serve(listen);
+            return;
+        }
+        Some(Cmd::Diff { before, after }) => {
+            let read = |p: &PathBuf| {
+                std::fs::read_to_string(p).unwrap_or_else(|e| {
+                    eprintln!("netdistill: cannot read {}: {e}", p.display());
+                    std::process::exit(1);
+                })
+            };
+            let (b, a) = (read(before), read(after));
+            if cli.json {
+                println!(
+                    "{}",
+                    netdistill::diff_to_string(&b, &a, cli.budget, true, kind)
+                );
+            } else {
+                print!(
+                    "{}",
+                    netdistill::diff_to_string(&b, &a, cli.budget, false, kind)
+                );
+            }
             return;
         }
         None => {}

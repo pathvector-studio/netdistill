@@ -66,9 +66,14 @@ netdistill --full show_bgp.txt         # 全行残す（構造化はされる）
 netdistill --budget 800 session.log    # 約800トークンに収まるよう表を削る
 netdistill --json show_bgp.txt         # パイプライン向け JSON
 netdistill --kind route-table dump.txt # 自動判定を使わずパーサを強制指定
+netdistill diff before.txt after.txt   # 2スナップショット間の変化だけ出す
 ```
 
 エージェント/パイプラインでの典型: コマンド実行 → `netdistill` に通す → ダイジェストをモデルへ。省略された詳細が必要になったら、そのコマンドだけ `--full` で再実行。省略ノートが「何を再要求すべきか」をモデルに教えます。
+
+### diff モード
+
+`netdistill diff before.txt after.txt` は同一コマンドの2スナップショットを比較し、**変わったところだけ**を出します: `NEW:`/`RESOLVED:` のアラート、`old → new` 形式のサマリ変化、行単位の `Δ` 表（`+` 追加 / `-` 削除 / `~` 変更、セル単位で `old→new`）。同一の健全なスナップショット同士なら `no changes detected` の一行に畳まれます — 「メンテで何か壊れた？」への最安の回答です。内部では両側を省略なしでパースするので、普段は省略される healthy なエントリの変化も見逃しません。MCP の `diff` ツールと `POST /v1/diff` でも使えます。
 
 ## 組み込み方法
 

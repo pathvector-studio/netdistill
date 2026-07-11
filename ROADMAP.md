@@ -24,10 +24,14 @@
 - [ ] XR `show bgp instance all` instance headers
 - [ ] NX-OS `show interface`, EOS-specific route table quirks
 
-## v0.5 — diff & drill-down
-- [ ] `netdistill diff before.txt after.txt` — what changed, LLM-friendly
+## v0.5 — diff (shipped)
+- [x] `netdistill diff before.txt after.txt` — NEW/RESOLVED alerts, Δ tables, cell-level old→new
+- [x] `diff` exposed as MCP tool and `POST /v1/diff`
+
+## next
 - [ ] `--section` drill-down (re-emit one elided table in full)
 - [ ] Real tokenizer-based counting behind a feature flag
+- [ ] Numeric-drift damping in diff (ignore counter columns below a change threshold)
 
 ## v0.6 — hardening
 - [ ] Optional auth token for `serve` mode

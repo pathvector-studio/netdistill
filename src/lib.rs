@@ -1,4 +1,5 @@
 pub mod detect;
+pub mod diff;
 pub mod http;
 pub mod mcp;
 pub mod model;
@@ -25,6 +26,26 @@ pub struct Options {
     pub full: bool,
     /// Force a specific parser instead of auto-detection.
     pub kind: Option<Kind>,
+}
+
+/// Diff two snapshots of the same command output and render only the changes.
+/// Both sides are parsed with `full: true` so changes in normally-elided
+/// (healthy) entries are still caught.
+pub fn diff_to_string(
+    before: &str,
+    after: &str,
+    budget: Option<usize>,
+    json: bool,
+    kind: Option<Kind>,
+) -> String {
+    let opts = Options { full: true, kind };
+    let docs = diff::diff_docs(distill(before, &opts), distill(after, &opts));
+    let in_tok = token::estimate(before) + token::estimate(after);
+    if json {
+        render::render_json(&docs, in_tok)
+    } else {
+        render::render_text(docs, in_tok, budget)
+    }
 }
 
 /// One-call convenience shared by the CLI, the MCP server, and the HTTP API:

@@ -214,6 +214,18 @@ Both servers are thin wrappers over the same `distill_to_string(input, full, bud
 - **MCP** (`netdistill mcp`): newline-delimited JSON-RPC 2.0 over stdio. Implements `initialize` (echoes the client's protocol version), `ping`, `tools/list`, `tools/call`; notifications get no response, unknown methods/tools return proper JSON-RPC errors (-32601/-32602). One tool: `distill`.
 - **HTTP** (`netdistill serve`): a 4-thread `tiny_http` server. `POST /v1/distill` accepts either the raw CLI output as the body (options via query string) or a JSON envelope; `route()` is a pure function of (method, path, query, content-type, body) and is unit-tested without sockets. No auth by design — bind to localhost (default) or front it yourself.
 
+## [7] Diff mode — `diff.rs`
+
+`netdistill diff` distills both snapshots with `full: true` (so changes in normally-elided healthy entries are caught), then diffs at the **Doc level**, not the text level:
+
+- **Alerts** are set-compared: in after-only → `NEW:`, in before-only → `RESOLVED:`; alerts present in both are counted in a note, not re-raised.
+- **Summary lines** are matched by their `key:` prefix; changed values render as `key: old → new`.
+- **Table rows** are keyed by the first column (first two if the first is not unique, e.g. LLDP). Added rows get `Δ=+`, removed `Δ=-`, changed `Δ=~` with each differing cell rendered `old→new`. Unchanged rows collapse to a count.
+- Sections that exist on only one side (kind mismatch, added/removed commands in a session log) are flagged as alerts.
+- Zero changes → a single `no changes detected` summary line.
+
+Because the diff operates on distilled structure, counter noise is already reduced (the digest doesn't carry MsgRcvd etc.), but naturally-drifting columns (prefix counts, uptimes) will still show as `~` rows — the standing note warns the LLM about this. Threshold-based damping is on the roadmap.
+
 ## Where the compression comes from
 
 Decomposing the 50,000-route → 164-token (99.98%) result:
