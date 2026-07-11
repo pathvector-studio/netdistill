@@ -1,6 +1,6 @@
 [package]
 name = "netdistill"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 description = "Distill network CLI output and configs into LLM-friendly context — anomalies first, aggregates instead of dumps, explicit elision."
 license = "MIT"

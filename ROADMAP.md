@@ -11,11 +11,12 @@
 - [x] MCP server mode (`netdistill mcp`, stdio) — agents call `distill` as a tool
 - [x] HTTP API mode (`netdistill serve`, POST /v1/distill) — callable from any language
 
-## v0.3 — coverage
-- [ ] `show ip bgp` / `show route protocol bgp` full-table digest (AS-path stats, origin mix)
+## v0.3 — coverage (shipped)
+- [x] `show ip bgp` full-table digest (origin-AS histogram, AS-path stats, s/d/r alerts)
+- [x] `show ip ospf neighbor`, `show isis neighbors`, `show lldp neighbors`
+- [x] Release binaries (release.yml: linux musl x86_64/aarch64, macOS x86_64/arm64) — no Rust toolchain needed to run
 - [ ] IOS-XR native formats (`show route vrf all` XR headers, `show bgp instance all`)
 - [ ] NX-OS / EOS / Huawei VRP dialects
-- [ ] `show ip ospf neighbor`, `show isis adjacency`, `show lldp neighbors`
 - [ ] Junos `show configuration` (set-style and hierarchical)
 - [ ] Named-command hint flag (`--cmd "show ip route"`) to override detection
 

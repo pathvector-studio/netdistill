@@ -133,6 +133,28 @@ Walks blocks using the IOS convention that child lines are indented by one space
 
 **Elision rule**: interfaces with nothing configured (no IP/desc/vrf/vlan/shutdown) are dropped from the table, with a count in the note.
 
+### bgp-table (`parse/bgp_table.rs`)
+
+For a full `show ip bgp` table (the other context killer besides route tables).
+
+**Row admission**: leading chars from the status alphabet (`*>sdhir...`), which must include at least one of `*sdhr`; the first token after them must be address-shaped (hex digits, `.`, `:`, `/` only) — this rejects the indented continuation lines of the Status codes legend. **Network vs additional-path rows** are told apart by column position: if the flags+padding region ends before the Next Hop column (taken from the header line), the row carries a network; otherwise it is another path for the previous network.
+
+**Path field by column, not tokens**: Metric/LocPrf/Weight are numbers and so are AS numbers — token-based parsing cannot separate them. The `Path` column offset is read from the header line and the path field is sliced from there, so an empty AS path (locally originated) is never confused with the Weight column.
+
+**Aggregates**: networks / paths / best counts; origin-AS histogram over *best* paths (top 10; `{AS_SET}` uses its first member); AS-path length avg/max; next-hop histogram; locally-originated count. **Alerts**: networks with no best path (with examples), and per-flag counts of suppressed / damped / history / RIB-failure paths. **Elision**: per-prefix rows are *never* re-emitted, even with `--full` — the note says to run the routing table through `--full` instead.
+
+### ospf-neighbors (`parse/ospf_neighbors.rs`)
+
+Rows are lines whose first token is a dotted router-ID and second a numeric priority. The point-to-point state `FULL/  -` splits into two tokens and is re-joined. **Healthy** = state starts with `FULL` or `2WAY`; everything else (EXSTART, EXCHANGE, INIT, DOWN, ...) is a stuck adjacency and alerts. When 2WAY neighbors exist, a note explains they are normal between non-DR/BDR routers, so the LLM doesn't flag them.
+
+### isis-neighbors (`parse/isis_neighbors.rs`)
+
+Rows are ≥6-token lines whose 5th token is `UP`/`DOWN`/`INIT`. Non-UP adjacencies alert; summary counts by level (L1/L2/L1L2) and interface.
+
+### lldp-neighbors (`parse/lldp_neighbors.rs`)
+
+Inventory, not state: every row is unique information, so **nothing is elided** — the win is padding→tabs and dropping the hold-time column. One alert: if `Total entries displayed: N` disagrees with the parsed row count, the output may be truncated or an unrecognized dialect (honesty check on ourselves).
+
 ### generic (`parse/generic.rs`)
 
 Near-lossless compaction for unrecognized input. Exactly three transformations:

@@ -1,0 +1,6 @@
+Tag CORE:
+System Id      Type Interface     IP Address      State Holdtime Circuit Id
+core-2         L2   Gi0/0         10.0.0.1        UP    28       core-2.01
+core-3         L2   Gi0/1         10.0.0.5        UP    24       core-3.01
+edge-1         L1L2 Gi0/2         10.0.2.7        INIT  292      edge-1.02
+edge-2         L1   Gi0/3         10.0.3.2        UP    9        edge-2.01

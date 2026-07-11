@@ -1,8 +1,12 @@
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Kind {
     BgpSummary,
+    BgpTable,
     RouteTable,
     Interfaces,
+    OspfNeighbors,
+    IsisNeighbors,
+    LldpNeighbors,
     Config,
     Generic,
 }
@@ -15,12 +19,26 @@ pub fn detect(input: &str) -> Kind {
     if has("line protocol is") {
         return Kind::Interfaces;
     }
+    // Full BGP table before summary: both mention BGP in the banner, but only
+    // the table has the Status codes legend plus the Network/Next Hop header.
+    if has("Status codes:") && has("Network") && has("Next Hop") {
+        return Kind::BgpTable;
+    }
     if has("MsgRcvd")
         || has("State/PfxRcd")
         || (has("InPkt") && has("OutPkt"))
         || has("BGP router identifier")
     {
         return Kind::BgpSummary;
+    }
+    if has("Neighbor ID") && has("Dead Time") {
+        return Kind::OspfNeighbors;
+    }
+    if has("System Id") && has("Holdtime") {
+        return Kind::IsisNeighbors;
+    }
+    if has("Device ID") && has("Port ID") {
+        return Kind::LldpNeighbors;
     }
     if has("Routing Table:")
         || has("Gateway of last resort")

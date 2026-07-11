@@ -29,8 +29,12 @@
 | 入力 | 判定 | 蒸留内容 |
 |---|---|---|
 | `show bgp summary` (IOS / FRR / EOS系, Junos) | `bgp-summary` | ピア状態の集計、経路数合計、上位ピア。異常/注目ピアのみ列挙 |
+| `show ip bgp` フルテーブル (IOS / FRR) | `bgp-table` | networks/paths/best 集計、origin AS ヒストグラム、AS パス長統計、suppressed/damped/RIB-failure 警告。prefix は再出力しない |
 | `show ip route [vrf all]` (IOS/XR), `show route` (Junos) | `route-table` | VRF×プロトコル表、デフォルトルート有無、上位 next-hop、hidden route 警告 |
 | `show interfaces` (IOS系) | `interfaces` | up/down 集計。エラー・ドロップ・想定外 down の IF のみ列挙 |
+| `show ip ospf neighbor` (IOS / FRR) | `ospf-neighbors` | IF別の状態集計。FULL でない(スタックした)隣接のみ列挙。2WAY/DROTHER は正常扱い |
+| `show isis neighbors` (IOS / FRR) | `isis-neighbors` | レベル/IF 別集計。UP でない隣接のみ列挙 |
+| `show lldp neighbors` (IOS系) | `lldp-neighbors` | インベントリは全行保持(トポロジ情報)、パディングのみ除去。宣言件数とパース行数の不一致を警告 |
 | running/startup config (IOS系) | `config` | インベントリ要約: IF 表、BGP ネイバー、VRF、ポリシー数。シークレットは出力しない |
 | その他すべて | `generic` | 準ロスレス圧縮: パディング→タブ、重複行→`[xN]`、空行圧縮 |
 
@@ -38,7 +42,13 @@
 
 ## インストール
 
-Rust 1.75+ が必要です。
+### バイナリ（推奨 — Rust 不要）
+
+[Releases](https://github.com/pathvector-studio/netdistill/releases) から静的バイナリをダウンロードして PATH に置くだけです（Linux x86_64/aarch64 は musl 静的リンクでどのディストリでも動作、macOS は Intel/Apple Silicon 両対応）。ランタイムも VM もインタプリタも不要です。
+
+### ソースから
+
+Rust 1.75+ が必要です（ビルド時のみ）。
 
 ```bash
 cargo install --path .

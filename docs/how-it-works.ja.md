@@ -133,6 +133,28 @@ IOS config の構造規約「ブロックの子行は空白1つでインデン�
 
 **省略規則**: 何も設定されていない IF（IP・desc・vrf・vlan・shutdown いずれも無し）は表から省き、件数をノートへ。
 
+### bgp-table (`parse/bgp_table.rs`)
+
+`show ip bgp` フルテーブル用（route table と並ぶもう一つのコンテキストキラー）。
+
+**行の採用基準**: 行頭がステータス文字集合（`*>sdhir...`）で、うち `*sdhr` を最低1つ含むこと。さらにフラグ直後の第1トークンがアドレス形状（16進・`.`・`:`・`/` のみ）であること — これで Status codes 凡例のインデント継続行を弾きます。**network 行か追加パス行か**は列位置で判別: フラグ＋パディングが Next Hop 列（ヘッダ行から取得）より手前で終われば network あり、そうでなければ直前 network の追加パス。
+
+**Path フィールドはトークンでなく列で切る**: Metric/LocPrf/Weight も AS 番号もどちらも数値なので、トークン分割では区別不能。ヘッダ行の `Path` 列オフセットからスライスすることで、空 AS パス（ローカル生成経路）を Weight 列と混同しません。
+
+**集計**: networks / paths / best 数、*best* パスの origin AS ヒストグラム（上位10、`{AS_SET}` は先頭メンバー）、AS パス長 avg/max、next-hop ヒストグラム、ローカル生成数。**アラート**: best パスの無い network（例付き）、suppressed / damped / history / RIB-failure のフラグ別件数。**省略**: prefix 単位の行は `--full` でも再出力しない — ノートで「経路表を --full で通せ」と案内。
+
+### ospf-neighbors (`parse/ospf_neighbors.rs`)
+
+第1トークンがドット区切り router-ID・第2トークンが数値 priority の行をデータ行とする。P2P の `FULL/  -` は2トークンに割れるので再結合。**healthy** = state が `FULL` または `2WAY` 始まり。それ以外（EXSTART, EXCHANGE, INIT, DOWN, ...）はスタックした隣接としてアラート。2WAY が居る場合は「非 DR/BDR 間では正常」というノートを付けて LLM の誤検報を防ぐ。
+
+### isis-neighbors (`parse/isis_neighbors.rs`)
+
+第5トークンが `UP`/`DOWN`/`INIT` の6トークン以上の行をデータ行とする。UP 以外をアラート。レベル別（L1/L2/L1L2）・IF 別に集計。
+
+### lldp-neighbors (`parse/lldp_neighbors.rs`)
+
+状態ではなくインベントリ: 全行が固有情報なので**何も省略しない** — 効くのはパディング→タブと hold-time 列の除去のみ。アラートは1種類: `Total entries displayed: N` とパース行数の不一致（出力の切断か未知方言 = 自分自身への正直チェック）。
+
 ### generic (`parse/generic.rs`)
 
 パーサが無い入力の**準ロスレス圧縮**。3変換のみ:

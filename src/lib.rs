@@ -7,9 +7,13 @@ pub mod token;
 
 pub mod parse {
     pub mod bgp_summary;
+    pub mod bgp_table;
     pub mod config;
     pub mod generic;
     pub mod interfaces;
+    pub mod isis_neighbors;
+    pub mod lldp_neighbors;
+    pub mod ospf_neighbors;
     pub mod route;
 }
 
@@ -40,8 +44,12 @@ pub fn distill(input: &str, opts: &Options) -> Vec<Doc> {
         .map(|(label, chunk)| {
             let mut doc = match detect::detect(&chunk) {
                 Kind::BgpSummary => parse::bgp_summary::parse(&chunk, opts.full),
+                Kind::BgpTable => parse::bgp_table::parse(&chunk, opts.full),
                 Kind::RouteTable => parse::route::parse(&chunk, opts.full),
                 Kind::Interfaces => parse::interfaces::parse(&chunk, opts.full),
+                Kind::OspfNeighbors => parse::ospf_neighbors::parse(&chunk, opts.full),
+                Kind::IsisNeighbors => parse::isis_neighbors::parse(&chunk, opts.full),
+                Kind::LldpNeighbors => parse::lldp_neighbors::parse(&chunk, opts.full),
                 Kind::Config => parse::config::parse(&chunk, opts.full),
                 Kind::Generic => parse::generic::parse(&chunk),
             };
