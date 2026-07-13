@@ -10,9 +10,9 @@ use tiny_http::{Header, Response, Server};
 const USAGE: &str = "netdistill HTTP API\n\
 \n\
 POST /v1/distill    body = raw CLI output (text/plain)\n\
-                    query: ?full=1  ?budget=800  ?format=json  ?kind=<parser>\n\
-                    or JSON body: {\"input\": \"...\", \"full\": false, \"budget\": 800, \"format\": \"text\"|\"json\", \"kind\": \"...\"}\n\
-POST /v1/diff       JSON body: {\"before\": \"...\", \"after\": \"...\", \"budget\": 800, \"format\": \"text\"|\"json\", \"kind\": \"...\"}\n\
+                    query: ?full=1  ?budget=800  ?format=text|json|toon|wire  ?kind=<parser>\n\
+                    or JSON body: {\"input\": \"...\", \"full\": false, \"budget\": 800, \"format\": \"text\"|\"json\"|\"toon\"|\"wire\", \"kind\": \"...\"}\n\
+POST /v1/diff       JSON body: {\"before\": \"...\", \"after\": \"...\", \"budget\": 800, \"format\": \"text\"|\"json\"|\"toon\"|\"wire\", \"kind\": \"...\"}\n\
                     returns only what changed between two snapshots\n\
 GET  /healthz       liveness + version\n";
 
@@ -115,7 +115,7 @@ pub fn route(
         ),
         ("GET", "/") => (200, "text/plain; charset=utf-8".into(), USAGE.to_string()),
         ("POST", "/v1/distill") => {
-            let (input, full, budget, as_json, kind_name, section) =
+            let (input, full, budget, format_name, kind_name, section) =
                 if content_type.contains("application/json") {
                     let v: serde_json::Value = match serde_json::from_str(body) {
                         Ok(v) => v,
@@ -129,7 +129,7 @@ pub fn route(
                         input,
                         v.get("full").and_then(|b| b.as_bool()).unwrap_or(false),
                         v.get("budget").and_then(|b| b.as_u64()).map(|b| b as usize),
-                        v.get("format").and_then(|f| f.as_str()) == Some("json"),
+                        v.get("format").and_then(|f| f.as_str()).map(str::to_string),
                         v.get("kind").and_then(|k| k.as_str()).map(str::to_string),
                         v.get("section")
                             .and_then(|s| s.as_str())
@@ -143,11 +143,15 @@ pub fn route(
                         body.to_string(),
                         matches!(qparam(query, "full"), Some("1") | Some("true") | Some("")),
                         qparam(query, "budget").and_then(|b| b.parse().ok()),
-                        qparam(query, "format") == Some("json"),
+                        qparam(query, "format").map(str::to_string),
                         qparam(query, "kind").map(str::to_string),
                         qparam(query, "section").map(str::to_string),
                     )
                 };
+            let format = match parse_format(format_name.as_deref()) {
+                Ok(f) => f,
+                Err(e) => return bad_request(&e),
+            };
             let kind = match kind_name.as_deref() {
                 Some(name) => match crate::detect::Kind::from_name(name) {
                     Some(k) => Some(k),
@@ -156,13 +160,8 @@ pub fn route(
                 None => None,
             };
             let out =
-                crate::distill_to_string(&input, full, budget, as_json, kind, section.as_deref());
-            let out_type = if as_json {
-                "application/json"
-            } else {
-                "text/plain; charset=utf-8"
-            };
-            (200, out_type.into(), out)
+                crate::distill_to_string(&input, full, budget, format, kind, section.as_deref());
+            (200, content_type_for(format), out)
         }
         ("POST", "/v1/diff") => {
             if !content_type.contains("application/json") {
@@ -180,7 +179,10 @@ pub fn route(
             ) else {
                 return bad_request("missing required fields: before, after");
             };
-            let as_json = v.get("format").and_then(|f| f.as_str()) == Some("json");
+            let format = match parse_format(v.get("format").and_then(|f| f.as_str())) {
+                Ok(f) => f,
+                Err(e) => return bad_request(&e),
+            };
             let budget = v.get("budget").and_then(|b| b.as_u64()).map(|b| b as usize);
             let drift = v
                 .get("drift")
@@ -194,19 +196,31 @@ pub fn route(
                 },
                 None => None,
             };
-            let out = crate::diff_to_string(before, after, budget, as_json, kind, drift);
-            let out_type = if as_json {
-                "application/json"
-            } else {
-                "text/plain; charset=utf-8"
-            };
-            (200, out_type.into(), out)
+            let out = crate::diff_to_string(before, after, budget, format, kind, drift);
+            (200, content_type_for(format), out)
         }
         _ => (
             404,
             "text/plain; charset=utf-8".into(),
             format!("not found: {method} {path}\n\n{USAGE}"),
         ),
+    }
+}
+
+/// Resolve an optional `format` string to a `Format` (default text).
+fn parse_format(name: Option<&str>) -> Result<crate::Format, String> {
+    match name {
+        None => Ok(crate::Format::Text),
+        Some(n) => crate::Format::from_name(n)
+            .ok_or_else(|| format!("unknown format: {n} (expected text, json, toon, or wire)")),
+    }
+}
+
+fn content_type_for(format: crate::Format) -> String {
+    if format == crate::Format::Json {
+        "application/json".into()
+    } else {
+        "text/plain; charset=utf-8".into()
     }
 }
 

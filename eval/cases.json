@@ -1,0 +1,77 @@
+{
+  "description": "Fidelity eval cases. Each asks a question whose answer netdistill preserves (anomalies, inventory, presence/absence). Graders are deterministic: all must_contain substrings present AND no must_not_contain substrings present, case-insensitive.",
+  "cases": [
+    {
+      "id": "bgp_down_peers",
+      "fixture": "frr_bgp_summary.txt",
+      "kind": "bgp-summary",
+      "question": "Which BGP neighbors are NOT in the Established state? List their neighbor IP addresses.",
+      "must_contain": ["10.0.16.2", "10.0.17.2"],
+      "must_not_contain": ["10.0.12.2", "10.0.13.2"]
+    },
+    {
+      "id": "bgp_total_peers",
+      "fixture": "frr_bgp_summary.txt",
+      "kind": "bgp-summary",
+      "question": "How many BGP neighbors are configured in total? Answer with just the number.",
+      "must_contain": ["8"],
+      "must_not_contain": []
+    },
+    {
+      "id": "ospf_stuck",
+      "fixture": "ios_ospf_neighbors.txt",
+      "kind": "ospf-neighbors",
+      "question": "Which OSPF neighbor is stuck in the EXSTART state? Give its neighbor ID.",
+      "must_contain": ["10.255.0.3"],
+      "must_not_contain": []
+    },
+    {
+      "id": "lldp_gi00_peer",
+      "fixture": "ios_lldp_neighbors.txt",
+      "kind": "lldp-neighbors",
+      "question": "Which device is connected to local interface Gi0/0?",
+      "must_contain": ["core-1"],
+      "must_not_contain": []
+    },
+    {
+      "id": "intf_crc_errors",
+      "fixture": "ios_show_interfaces.txt",
+      "kind": "interfaces",
+      "question": "Which interface is showing a high number of CRC / input errors? Give the interface name.",
+      "must_contain": ["0/1"],
+      "must_not_contain": []
+    },
+    {
+      "id": "intf_unexpected_down",
+      "fixture": "ios_show_interfaces.txt",
+      "kind": "interfaces",
+      "question": "Which interface is DOWN but NOT administratively shut down? Give its name.",
+      "must_contain": ["0/2"],
+      "must_not_contain": ["0/3"]
+    },
+    {
+      "id": "route_no_default",
+      "fixture": "ios_route_vrf_all.txt",
+      "kind": "route-table",
+      "question": "Which routing table / VRF has NO default route (no gateway of last resort)?",
+      "must_contain": ["MGMT"],
+      "must_not_contain": []
+    },
+    {
+      "id": "config_bgp_neighbors",
+      "fixture": "ios_running_config.txt",
+      "kind": "config",
+      "question": "List the BGP neighbor IP addresses configured on this device.",
+      "must_contain": ["10.0.12.2", "10.0.13.2"],
+      "must_not_contain": []
+    },
+    {
+      "id": "config_hostname",
+      "fixture": "ios_running_config.txt",
+      "kind": "config",
+      "question": "What is the hostname of this device?",
+      "must_contain": ["edge-tokyo-1"],
+      "must_not_contain": []
+    }
+  ]
+}

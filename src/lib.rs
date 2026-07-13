@@ -21,6 +21,7 @@ pub mod parse {
 
 use detect::Kind;
 use model::Doc;
+pub use render::Format;
 
 pub struct Options {
     pub full: bool,
@@ -36,18 +37,14 @@ pub fn diff_to_string(
     before: &str,
     after: &str,
     budget: Option<usize>,
-    json: bool,
+    format: Format,
     kind: Option<Kind>,
     drift_pct: u32,
 ) -> String {
     let opts = Options { full: true, kind };
     let docs = diff::diff_docs_with(distill(before, &opts), distill(after, &opts), drift_pct);
     let in_tok = token::estimate(before) + token::estimate(after);
-    if json {
-        render::render_json(&docs, in_tok)
-    } else {
-        render::render_text(docs, in_tok, budget)
-    }
+    render::render(docs, in_tok, budget, format)
 }
 
 /// Drill-down: keep only tables whose title contains `section`
@@ -84,7 +81,7 @@ pub fn distill_to_string(
     input: &str,
     full: bool,
     budget: Option<usize>,
-    json: bool,
+    format: Format,
     kind: Option<Kind>,
     section: Option<&str>,
 ) -> String {
@@ -101,11 +98,7 @@ pub fn distill_to_string(
     if let Some(sec) = section {
         filter_section(&mut docs, sec);
     }
-    if json {
-        render::render_json(&docs, in_tok)
-    } else {
-        render::render_text(docs, in_tok, budget)
-    }
+    render::render(docs, in_tok, budget, format)
 }
 
 /// Distill one blob of input (possibly a whole terminal session containing

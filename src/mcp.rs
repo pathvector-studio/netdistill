@@ -68,7 +68,19 @@ pub fn handle_message(line: &str) -> Option<String> {
                 .get("budget")
                 .and_then(|v| v.as_u64())
                 .map(|v| v as usize);
-            let as_json = args.get("format").and_then(|v| v.as_str()) == Some("json");
+            let format = match args.get("format").and_then(|v| v.as_str()) {
+                Some(name) => match crate::Format::from_name(name) {
+                    Some(f) => f,
+                    None => {
+                        return Some(error_response(
+                            id,
+                            -32602,
+                            &format!("unknown format: {name}"),
+                        ))
+                    }
+                },
+                None => crate::Format::Text,
+            };
             let kind = match args.get("kind").and_then(|v| v.as_str()) {
                 Some(name) => match crate::detect::Kind::from_name(name) {
                     Some(k) => Some(k),
@@ -89,7 +101,7 @@ pub fn handle_message(line: &str) -> Option<String> {
                     };
                     let full = args.get("full").and_then(|v| v.as_bool()).unwrap_or(false);
                     let section = args.get("section").and_then(|v| v.as_str());
-                    crate::distill_to_string(input, full, budget, as_json, kind, section)
+                    crate::distill_to_string(input, full, budget, format, kind, section)
                 }
                 "diff" => {
                     let (Some(before), Some(after)) = (
@@ -107,7 +119,7 @@ pub fn handle_message(line: &str) -> Option<String> {
                         .and_then(|v| v.as_u64())
                         .map(|v| v as u32)
                         .unwrap_or(crate::diff::DEFAULT_DRIFT_PCT);
-                    crate::diff_to_string(before, after, budget, as_json, kind, drift)
+                    crate::diff_to_string(before, after, budget, format, kind, drift)
                 }
                 _ => return Some(error_response(id, -32602, &format!("unknown tool: {name}"))),
             };
@@ -134,7 +146,7 @@ fn diff_spec() -> Value {
                 "before": {"type": "string", "description": "Earlier snapshot (raw CLI output or config)"},
                 "after": {"type": "string", "description": "Later snapshot of the same command"},
                 "budget": {"type": "integer", "description": "Approximate output token budget"},
-                "format": {"type": "string", "enum": ["text", "json"], "description": "Output format (default text)"},
+                "format": {"type": "string", "enum": ["text", "json", "toon", "wire"], "description": "Output format (default text). toon = token-oriented (fewer tokens than json, schema-explicit); wire = dense LLM-only"},
                 "kind": {"type": "string", "description": "Force a specific parser instead of auto-detection"},
                 "drift": {"type": "integer", "description": "Suppress rows changed only by counters/uptimes drifting less than this percent (default 10; 0 = report everything)"}
             },
@@ -164,8 +176,8 @@ fn distill_spec() -> Value {
                 },
                 "format": {
                     "type": "string",
-                    "enum": ["text", "json"],
-                    "description": "Output format (default text)"
+                    "enum": ["text", "json", "toon", "wire"],
+                    "description": "Output format (default text). toon = token-oriented (fewer tokens than json, schema-explicit); wire = dense LLM-only (all human formatting stripped)"
                 },
                 "kind": {
                     "type": "string",

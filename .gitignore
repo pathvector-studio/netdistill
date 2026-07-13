@@ -1,1 +1,4 @@
 /target
+
+# transient eval output (most-recent run); keep the named per-model reports
+/eval/last_report.md

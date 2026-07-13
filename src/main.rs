@@ -1,5 +1,5 @@
 use clap::{Parser, Subcommand};
-use netdistill::{distill, render, token, Options};
+use netdistill::{distill, render, token, Format, Options};
 use std::io::Read;
 use std::path::PathBuf;
 
@@ -20,9 +20,13 @@ struct Cli {
     /// Approximate output token budget; table detail is trimmed to fit
     #[arg(long)]
     budget: Option<usize>,
-    /// Emit structured JSON instead of text
+    /// Emit structured JSON instead of text (alias for --format json)
     #[arg(long)]
     json: bool,
+    /// Output format: text (default, human), json (structured), toon
+    /// (token-oriented, ~40% fewer tokens than json), wire (dense LLM-only)
+    #[arg(long)]
+    format: Option<String>,
     /// Force a specific parser instead of auto-detection
     /// (bgp-summary, bgp-table, route-table, interfaces, ospf-neighbors,
     /// isis-neighbors, lldp-neighbors, config, junos-config, generic)
@@ -73,6 +77,19 @@ fn main() {
         })
     });
 
+    // --format wins; --json is a legacy alias; default is text.
+    let format = match cli.format.as_deref() {
+        Some(name) => Format::from_name(name).unwrap_or_else(|| {
+            eprintln!(
+                "netdistill: unknown --format '{name}' (expected one of: {})",
+                Format::NAMES.join(", ")
+            );
+            std::process::exit(2);
+        }),
+        None if cli.json => Format::Json,
+        None => Format::Text,
+    };
+
     match &cli.command {
         Some(Cmd::Mcp) => {
             netdistill::mcp::serve_stdio();
@@ -97,16 +114,11 @@ fn main() {
                 })
             };
             let (b, a) = (read(before), read(after));
-            if cli.json {
-                println!(
-                    "{}",
-                    netdistill::diff_to_string(&b, &a, cli.budget, true, kind, *drift)
-                );
+            let out = netdistill::diff_to_string(&b, &a, cli.budget, format, kind, *drift);
+            if format == Format::Json {
+                println!("{out}");
             } else {
-                print!(
-                    "{}",
-                    netdistill::diff_to_string(&b, &a, cli.budget, false, kind, *drift)
-                );
+                print!("{out}");
             }
             return;
         }
@@ -162,9 +174,10 @@ fn main() {
         netdistill::filter_section(&mut docs, sec);
     }
 
-    if cli.json {
-        println!("{}", render::render_json(&docs, in_tok));
+    let out = render::render(docs, in_tok, cli.budget, format);
+    if format == Format::Json {
+        println!("{out}");
     } else {
-        print!("{}", render::render_text(docs, in_tok, cli.budget));
+        print!("{out}");
     }
 }

@@ -85,7 +85,9 @@ ssh router1 'show ip route vrf all' | netdistill     # or stdin
 
 netdistill --full show_bgp.txt         # keep every row (still restructured)
 netdistill --budget 800 session.log    # trim tables to fit ~800 tokens
-netdistill --json show_bgp.txt         # structured JSON for pipelines
+netdistill --format toon show_bgp.txt  # token-oriented (48-69% under json)
+netdistill --format wire show_bgp.txt  # dense LLM-only mode (see below)
+netdistill --json show_bgp.txt         # structured JSON (alias for --format json)
 netdistill --kind route-table dump.txt # force a parser, skip auto-detection
 netdistill diff before.txt after.txt   # only what changed between snapshots
 netdistill diff a.txt b.txt --drift 0  # report even tiny counter drift
@@ -93,6 +95,23 @@ netdistill --section next-hops r1.txt  # re-emit one elided table in full
 ```
 
 Typical agent/pipeline use: run the command, pipe through `netdistill`, hand the digest to the model. If the model needs detail that was elided, re-run with `--full` for just that command — the elision notes tell it exactly what to ask for.
+
+### Output formats
+
+`--format` (CLI) / `"format"` (MCP + HTTP) picks the serialization; the digest content is identical, only the encoding changes:
+
+| format | for | vs. baseline |
+|---|---|---|
+| `text` (default) | humans reading a terminal | — |
+| `json` | programmatic pipelines | verbose |
+| `toon` | LLMs consuming structured data | **48–69% fewer tokens than `json`** |
+| `wire` | LLM-only, squeeze every token | 6–11% under `text` |
+
+`toon` is [Token-Oriented Object Notation](https://github.com/toon-format/toon): uniform tables become `title[N]{col,col}:` + comma rows, so the repeated keys and punctuation that bloat JSON disappear while the schema stays explicit (which keeps model parsing accuracy up).
+
+`wire` strips every human affordance — markdown, spelled-out section labels, blank lines, column padding — down to one-character line tags (`#` doc, `!` alert, `.` summary, `|` table, `-` elision note). It deliberately stops at terse **ASCII**: research on LLMs over compressed text shows that pushing further into base64 or binary encodings tokenizes *worse* and degrades the model's reasoning. The token-efficient sweet spot is dense-but-in-distribution.
+
+In every format, **elision is still stated explicitly** — `495 healthy peers omitted` is never silently dropped. That is the one guarantee netdistill will not trade for tokens.
 
 ### Diff mode
 
@@ -141,6 +160,29 @@ curl -s -H 'content-type: application/json' \
 ```
 
 `GET /healthz` for liveness, `GET /` for usage. The JSON response carries `docs[]` (alerts / summary / tables as structure) plus token estimates — handy as a pre-filter: only wake the LLM when `alerts` is non-empty.
+
+## Does the answer survive the compression?
+
+Smaller only counts if the model can still answer. [`eval/`](eval/) measures
+exactly that: it renders each fixture in every format, asks a real LLM the same
+question, and grades the answer deterministically — recording the backend's true
+token count, not an estimate.
+
+On `gemma3:12b`, across 9 questions spanning BGP / routes / interfaces / config /
+OSPF / LLDP:
+
+| format | accuracy | tokens vs raw |
+|---|---|---|
+| raw | 100% (9/9) | 100% |
+| json | 100% | 71% |
+| toon | 100% | 49% |
+| text | 100% | 48% |
+| **wire** | 100% | **46%** |
+
+Same answers, ~half the tokens — including the explicit elision notes. (Fixtures
+are kept small so raw fits in context and answers are comparable; the saving
+grows with input size.) See [`eval/README.md`](eval/README.md) to reproduce or
+point it at another model.
 
 ## Design principles
 
