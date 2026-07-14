@@ -72,6 +72,14 @@
       "question": "What is the hostname of this device?",
       "must_contain": ["edge-tokyo-1"],
       "must_not_contain": []
+    },
+    {
+      "id": "big_bgp_buried_down",
+      "fixture": "big_bgp_ios_500.txt",
+      "kind": "bgp-summary",
+      "question": "Out of 500 BGP peers, which few are NOT in an Established state (shown as Active/Idle)? List their neighbor IP addresses.",
+      "must_contain": ["10.20.1.7", "10.20.2.44", "10.20.4.19"],
+      "must_not_contain": []
     }
   ]
 }

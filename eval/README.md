@@ -60,3 +60,47 @@ On gemma3:12b every format scored **100% (9/9)** while cutting real prompt
 tokens roughly in half (`wire` to 46% of raw, `toon`/`text` ~48%, `json` 71%).
 The full digest — including its explicit elision notes — carries the answer at
 half the tokens.
+
+## netdistill vs. the alternatives (`compare.py`)
+
+`run.py` compares netdistill's own formats. [`compare.py`](compare.py) is the
+head-to-head against the *other* ways engineers get device output into an LLM:
+
+| method | what it is |
+|---|---|
+| `truncate` | naive head-to-budget — the "just cut it" floor |
+| `strip-dedup` | domain-blind whitespace-collapse + identical-line dedup (stand-in for generic compressors like sqz / defluffer) |
+| `llmlingua` | LLMLingua-2 (Microsoft) — academic SOTA task-agnostic prompt compression |
+| `textfsm-json` | ntc-templates / TextFSM parsed → JSON (structure, not summary) |
+
+Same fidelity question, same grader, real prompt-token counts. Result on
+gemma3:12b (10 cases, see [`compare_report.md`](compare_report.md)):
+
+| method | fidelity | size vs raw |
+|---|---|---|
+| netdistill:text / toon | **100%** | **13%** |
+| raw | 90% | 100% |
+| truncate | 40% | 13% |
+| strip-dedup | 70% | 64% |
+| llmlingua | (domain-blind, silently drops anomalies) | — |
+| textfsm-json | 67% (6/10 covered) | **589%** (bigger than raw) |
+
+Two findings worth the harness: netdistill can be **more accurate than raw**
+(anomalies-first beats lost-in-the-middle on a 500-peer table), and every
+alternative loses on at least one axis — truncation and generic compression
+drop the anomalies, TextFSM *inflates* tokens, and LLMLingua-2 (trained on
+meeting transcripts) shreds IP addresses and silently deletes the down peers.
+
+`compare.py` needs the eval venv **plus** `textfsm ntc-templates` and,
+optionally, `llmlingua` (heavy — pulls torch/transformers):
+
+```bash
+uv venv --python 3.12 evalenv
+uv pip install --python evalenv/bin/python textfsm ntc-templates
+uv pip install --python evalenv/bin/python torch --index-url https://download.pytorch.org/whl/cpu
+uv pip install --python evalenv/bin/python llmlingua      # optional
+evalenv/bin/python eval/compare.py --model gemma3:12b
+```
+
+Missing optional deps degrade gracefully — those methods report `n·a` instead of
+failing the run.
