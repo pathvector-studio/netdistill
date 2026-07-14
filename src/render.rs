@@ -38,16 +38,17 @@ impl Format {
 /// Render a distilled digest in the requested format, honoring an optional
 /// token budget (Text/Toon/Wire progressively trim table rows and raw bodies;
 /// Json is emitted whole).
-pub fn render(docs: Vec<Doc>, input_tokens: usize, budget: Option<usize>, format: Format) -> String {
+pub fn render(
+    docs: Vec<Doc>,
+    input_tokens: usize,
+    budget: Option<usize>,
+    format: Format,
+) -> String {
     match format {
         Format::Json => render_json(&docs, input_tokens),
         Format::Text => render_budgeted(docs, input_tokens, budget, render_body, Format::Text),
-        Format::Toon => {
-            render_budgeted(docs, input_tokens, budget, render_body_toon, Format::Toon)
-        }
-        Format::Wire => {
-            render_budgeted(docs, input_tokens, budget, render_body_wire, Format::Wire)
-        }
+        Format::Toon => render_budgeted(docs, input_tokens, budget, render_body_toon, Format::Toon),
+        Format::Wire => render_budgeted(docs, input_tokens, budget, render_body_wire, Format::Wire),
     }
 }
 

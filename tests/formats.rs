@@ -49,11 +49,20 @@ fn wire_strips_human_affordances() {
     // no markdown headers, no spelled-out section labels
     assert!(!wire.contains("## ["), "wire must drop markdown headers");
     assert!(!wire.contains("ALERTS"), "wire must drop the ALERTS label");
-    assert!(!wire.contains("SUMMARY:"), "wire must drop the SUMMARY label");
+    assert!(
+        !wire.contains("SUMMARY:"),
+        "wire must drop the SUMMARY label"
+    );
     // terse receipt prefix instead of the prose one
-    assert!(wire.starts_with("nd in="), "wire receipt should be terse:\n{wire}");
+    assert!(
+        wire.starts_with("nd in="),
+        "wire receipt should be terse:\n{wire}"
+    );
     // one-char tags present
-    assert!(wire.contains("\n|") || wire.starts_with('|'), "wire needs table tag |");
+    assert!(
+        wire.contains("\n|") || wire.starts_with('|'),
+        "wire needs table tag |"
+    );
 }
 
 #[test]
@@ -130,6 +139,9 @@ fn budget_trims_and_stays_faithful_in_new_formats() {
         let o = distill_to_string(&input, false, Some(120), format, None, None);
         let tok = token::estimate(&o);
         // budget is approximate; allow slack but it must actually shrink.
-        assert!(tok < 400, "format {format:?} should shrink toward budget: {tok} tok");
+        assert!(
+            tok < 400,
+            "format {format:?} should shrink toward budget: {tok} tok"
+        );
     }
 }
