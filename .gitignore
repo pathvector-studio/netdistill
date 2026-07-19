@@ -2,3 +2,8 @@
 
 # transient eval output (most-recent run); keep the named per-model reports
 /eval/last_report.md
+
+# python eval tooling
+/eval/__pycache__/
+*.pyc
+/eval/evalenv/
