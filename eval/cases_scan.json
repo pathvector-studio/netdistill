@@ -1,0 +1,37 @@
+{
+  "description": "Row-scan-with-condition questions over tables netdistill KEEPS (not elided). The table research says positional/tabular formats weaken here vs self-contained key=value objects, because the model must map a column position back to its header. This probes exactly that: netdistill:wire/toon (positional) vs netdistill:kv (self-contained). Graders are deterministic (must_contain all, must_not_contain none).",
+  "cases": [
+    {
+      "id": "lldp_tengig_uplink",
+      "fixture": "ios_lldp_neighbors.txt",
+      "kind": "lldp-neighbors",
+      "question": "Which neighbor device is connected over a 10-Gigabit (TenGigabit) port? Those have a Port ID starting with 'Te'. Give the device name.",
+      "must_contain": ["core-1"],
+      "must_not_contain": ["pdu-rack3"]
+    },
+    {
+      "id": "route_bgp_gt2",
+      "fixture": "ios_route_vrf_all.txt",
+      "kind": "route-table",
+      "question": "Which routing tables / VRFs carry MORE THAN 2 BGP routes? List their names.",
+      "must_contain": ["default", "CUST-A"],
+      "must_not_contain": ["MGMT"]
+    },
+    {
+      "id": "route_ospf_gt_bgp",
+      "fixture": "ios_route_vrf_all.txt",
+      "kind": "route-table",
+      "question": "Which single routing table / VRF has MORE OSPF routes than BGP routes? Give just its name.",
+      "must_contain": ["default"],
+      "must_not_contain": ["CUST-A"]
+    },
+    {
+      "id": "config_transit_peergroup",
+      "fixture": "ios_running_config.txt",
+      "kind": "config",
+      "question": "Which BGP neighbor IP address belongs to the peer-group named TRANSIT?",
+      "must_contain": ["10.0.13.2"],
+      "must_not_contain": ["10.0.12.2"]
+    }
+  ]
+}

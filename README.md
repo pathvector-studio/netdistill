@@ -113,6 +113,8 @@ Typical agent/pipeline use: run the command, pipe through `netdistill`, hand the
 
 In every format, **elision is still stated explicitly** — `495 healthy peers omitted` is never silently dropped. That is the one guarantee netdistill will not trade for tokens.
 
+**Which format?** `text` is the robust default — it wins on both lookup and row-scan-with-condition questions in the [benchmark](eval/RESULTS.md#36-the-hard-case-for-tabular-formats-rowscanwithcondition). Use `toon`/`wire` to squeeze tokens on lookup-heavy work; note `toon` is the weakest at *scanning* rows to apply a condition, so prefer `text` there.
+
 ### Diff mode
 
 `netdistill diff before.txt after.txt` compares two snapshots of the same command and emits **only what changed**: `NEW:`/`RESOLVED:` alerts, changed summary values as `old → new`, and per-row `Δ` tables (`+` added, `-` removed, `~` changed with cell-level `old→new`). Two identical healthy snapshots collapse to `no changes detected` — the cheapest possible answer to "did the maintenance break anything?". Both sides are parsed unelided internally, so a change in a previously-healthy entry is never missed. Also available as the `diff` MCP tool and `POST /v1/diff`.

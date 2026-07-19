@@ -172,6 +172,43 @@ BGP router identifier 10. 255. 0. 1 local AS number 65000
 Domain‑blind **and** silently lossy — the exact combination netdistill is built
 to avoid. Hence 10% fidelity despite a healthy token budget.
 
+### 3.6 The hard case for tabular formats: row‑scan‑with‑condition
+
+The table‑serialization literature warns that positional/tabular encodings weaken
+when the model must *scan rows and apply a condition* (it has to map a column
+position back to its header), and that self‑contained key=value objects help. We
+tested it directly: 4 questions that scan a **retained** table and filter it
+(e.g. "which VRFs carry >2 BGP routes", "which neighbor is in peer‑group
+TRANSIT"), adding a `netdistill:kv` format (each row as `col=val, col=val`).
+Harness: [`cases_scan.json`](cases_scan.json), reports
+[gemma](scan_report_gemma3_12b.md) / [qwen](scan_report_qwen25_14b.md).
+
+| format | gemma3:12b | qwen2.5:14b | size vs raw | note |
+|---|---|---|---|---|
+| **netdistill:text** (TSV + header) | **100% (4/4)** | **100% (4/4)** | 45% | robust *and* cheap |
+| netdistill:kv (self‑contained) | 75% | 100% | 60% | helps some models, +33% tokens |
+| netdistill:wire | 75% | 75% | 41% | middling |
+| netdistill:toon | 50% | 75% | 46% | **weakest at scanning** |
+| raw | 50% | 75% | 100% | noise hurts scanning too |
+
+Findings, partially against our own prediction:
+
+- The predicted weakness is real, but it lands on **`toon`**, not "tabular" in
+  general — its comma‑packed `[N]{cols}` rows are hardest to scan, even though
+  `toon` ties `text` on lookups (§3.1–3.2).
+- **`text` (tab‑separated with a header row) is the most robust format for
+  scan‑with‑condition — 100% on both models — and stays token‑cheap.** It is the
+  safe default across *both* question shapes.
+- **`kv` only partly confirms the literature:** it beat `toon`/`wire` and hit
+  100% on qwen, but not on gemma, and costs ~33% more tokens. A targeted fallback
+  for a model that struggles, not a free win.
+- Even `raw` scores 50–75% here: removing noise helps the model scan, so
+  distillation aids this shape too — just pick `text`.
+
+**Practical guidance:** `text` for general use (robust on both lookups and
+scans); `toon`/`wire` when squeezing tokens on lookup‑heavy workloads; reach for
+`kv` only if a specific model mis‑scans your tables.
+
 ## 4. Findings
 
 1. **Distillation can beat raw.** Putting anomalies first defeats
@@ -187,17 +224,23 @@ to avoid. Hence 10% fidelity despite a healthy token budget.
 5. **SOTA prose compression is actively harmful here.** LLMLingua‑2 destroys the
    structure it can't recognize.
 6. **Density has a measurable ceiling.** `wire` (the densest format) is the one
-   netdistill format that ever dipped (90% on gemma, 100% on qwen), for ~5% fewer
-   tokens than `text`. `text`/`toon` are the safe default; `wire` is for squeezing
-   the last tokens when you've measured that it holds. This is the report's own
-   "bound density by measured comprehension" principle, observed.
+   netdistill format that dipped on the lookup suite (90% on gemma, 100% on qwen),
+   for ~5% fewer tokens than `text`. Density trades against comprehension, as the
+   report's own "bound density by measured comprehension" principle predicts.
+7. **Format choice depends on question shape (§3.6).** For lookups, `text`/`toon`
+   are equal; for row‑scan‑with‑condition, `text` (TSV+header) is clearly best
+   and `toon` is weakest. `text` is the robust default across both; `toon`/`wire`
+   are for token‑squeezing on lookup‑heavy work. This is why netdistill ships
+   several formats rather than one.
 
 ## 5. Threats to validity
 
-- **Small N.** 9–10 questions, curated fixtures. These are existence/aggregate
-  questions where distillation should win; a broader suite (multi‑hop reasoning,
-  row‑scan‑with‑conditions where tabular formats are known to weaken) could move
-  the numbers and is future work.
+- **Small N.** 9–10 questions in the main suite, plus a 4‑question
+  scan‑with‑condition probe (§3.6). Still small and curated; a broader suite
+  (multi‑hop reasoning, more scan shapes, adversarial phrasings) could move the
+  numbers and is future work. The scan probe already surfaced a real format split
+  (`toon` weak, `text` robust), so question shape clearly matters and deserves
+  wider coverage.
 - **Two models, one size class (12–14B).** Not tested on frontier or tiny models.
 - **Single run per cell.** `temperature=0` is near‑deterministic but not exactly;
   no variance bars.
@@ -223,6 +266,11 @@ uv pip install --python evalenv/bin/python torch --index-url https://download.py
 uv pip install --python evalenv/bin/python llmlingua        # optional (heavy)
 evalenv/bin/python eval/compare.py --model gemma3:12b
 evalenv/bin/python eval/compare.py --model qwen2.5:14b
+
+# row-scan-with-condition probe (§3.6), with the self-contained kv format:
+evalenv/bin/python eval/compare.py --model gemma3:12b \
+  --cases eval/cases_scan.json \
+  --methods raw,netdistill:text,netdistill:toon,netdistill:wire,netdistill:kv
 ```
 
 Point `NETDISTILL_EVAL_URL` at any Ollama endpoint; missing optional deps degrade
@@ -249,3 +297,31 @@ to `n·a` rather than failing the run. Raw per‑run reports:
   netdistill is `cat | distill` — zero infrastructure, on whatever was just pasted.
 
 See [`../ROADMAP.md`](../ROADMAP.md) for source links to each claim.
+
+## 8. Prior art: is anyone else doing this?
+
+Token-saving CLI compressors exist, and one shares netdistill's tagline almost
+word for word — but none occupies the same point in the design space
+(deterministic **and** network-domain-aware **and** explicit about elision).
+
+| tool | mechanism | domain | elision | footprint |
+|---|---|---|---|---|
+| [samuelfaj/distill](https://github.com/samuelfaj/distill) (& fork [Codex-distill](https://github.com/McBorisson/Codex-distill)) | **1.7B "expert" LM**, semantic filtering | general shell | **opaque** (docs don't state what's dropped) | npm + 8 GB RAM |
+| [rtk](https://github.com/rtk-ai/rtk) | rules/proxy | general dev cmds (git, docker, kubectl) | boilerplate stripping | single Rust binary |
+| [headroom](https://www.sitepoint.com/headroom-the-tokencompression-cli-that-cuts-your-llm-api-costs-by-6095/) | AST analysis | **source code** | — | CLI |
+| tokuin / token-compressor | generic prompt compression | any text | — | CLI |
+| ntc-templates / pyATS-Genie | template parsing | network CLI | — (emits *structure*, often **bigger**, §3.4) | python + parser corpus |
+| Batfish / Suzieq / NetClaw | config analysis / state DB / digital twin | network | — (models the network) | lab-grade infra |
+| **netdistill** | **deterministic parsing + aggregation + anomaly ranking** | **network CLI (multi-vendor)** | **explicit, labeled** | **single Rust binary** |
+
+The closest, `samuelfaj/distill`, is the instructive contrast: it does the same
+*job* (shrink CLI output for an LLM) with the opposite *method* — it runs a 1.7B
+model (8 GB RAM), works on any shell text, and, per its own docs, does not state
+what it omitted. netdistill is a zero-model single binary that knows what a BGP
+session or a route table *is*, ranks the anomalies, and **labels every omission**
+so the model can't mistake "absent" for "fine". The generic compressors (rtk,
+tokuin, headroom) don't target device output; the parser stacks (Genie,
+ntc-templates) produce structure rather than summaries; the analysis platforms
+(Batfish, Suzieq) model the network and need infrastructure. As of this writing
+we found **no deterministic, network-CLI-specific distiller with explicit
+elision** — the niche netdistill fills appears unoccupied.

@@ -68,6 +68,29 @@ def netdistill(raw, fmt, kind):
     ).stdout
 
 
+def netdistill_kv(raw, kind):
+    """Same distilled content as the other formats, but each table row is a
+    *self-contained* key=value object instead of a positional row. The table
+    research says this helps row-scan-with-condition questions (the model
+    doesn't have to map a column position back to a header). Built from the JSON
+    output — no Rust change needed."""
+    doc_json = json.loads(netdistill(raw, "json", kind))
+    out = []
+    for d in doc_json["docs"]:
+        out.append(f"[{d['kind']}] {d['headline']}")
+        out += [f"ALERT: {a}" for a in d.get("alerts", [])]
+        out += [f"- {s}" for s in d.get("summary", [])]
+        for t in d.get("tables", []):
+            hdr = t["header"]
+            for row in t["rows"]:
+                kvs = ", ".join(f"{h}={v}" for h, v in zip(hdr, row))
+                out.append(f"{t['title']}: {kvs}")
+            if t.get("omitted"):
+                out.append(f"({t['omitted']})")
+        out += [f"note: {n}" for n in d.get("notes", [])]
+    return "\n".join(out)
+
+
 def strip_dedup(raw):
     """Generic, domain-blind: collapse whitespace, drop blanks, dedup identical
     lines with an (xN) count. Represents the sqz/defluffer class."""
@@ -129,20 +152,23 @@ def textfsm_json(raw, fixture):
         return f"[textfsm parse error: {e}]"
 
 
-def build_methods(raw, case):
-    """Return ordered {method: context_or_None}. None = unsupported for this case."""
+def build_methods(raw, case, wanted):
+    """Return ordered {method: context_or_None} for the `wanted` methods only.
+    None = unsupported for this case. Thunks so we never pay for (e.g.) the
+    LLMLingua model load unless that method was requested."""
     kind, fixture = case["kind"], case["fixture"]
-    wire = netdistill(raw, "wire", kind)
-    return OrderedDict([
-        ("raw", raw),
-        ("netdistill:text", netdistill(raw, "text", kind)),
-        ("netdistill:toon", netdistill(raw, "toon", kind)),
-        ("netdistill:wire", wire),
-        ("truncate", truncate_to(raw, len(wire))),        # same budget as wire, naive
-        ("strip-dedup", strip_dedup(raw)),
-        ("llmlingua", llmlingua_compress(raw)),
-        ("textfsm-json", textfsm_json(raw, fixture)),
+    thunks = OrderedDict([
+        ("raw", lambda: raw),
+        ("netdistill:text", lambda: netdistill(raw, "text", kind)),
+        ("netdistill:toon", lambda: netdistill(raw, "toon", kind)),
+        ("netdistill:wire", lambda: netdistill(raw, "wire", kind)),
+        ("netdistill:kv", lambda: netdistill_kv(raw, kind)),
+        ("truncate", lambda: truncate_to(raw, len(netdistill(raw, "wire", kind)))),
+        ("strip-dedup", lambda: strip_dedup(raw)),
+        ("llmlingua", lambda: llmlingua_compress(raw)),
+        ("textfsm-json", lambda: textfsm_json(raw, fixture)),
     ])
+    return OrderedDict((m, thunks[m]()) for m in wanted)
 
 
 def ollama_generate(model, prompt):
@@ -168,21 +194,23 @@ def main():
     ap.add_argument("--model", default=os.environ.get("NETDISTILL_EVAL_MODEL", "gemma3:12b"))
     ap.add_argument("--cases", default=str(Path(__file__).parent / "cases.json"))
     ap.add_argument("--report", default=str(Path(__file__).parent / "compare_report.md"))
+    ap.add_argument("--methods", default="", help="comma-separated subset to run")
     ap.add_argument("--verbose", action="store_true")
     args = ap.parse_args()
     if BIN is None:
         sys.exit("netdistill binary not found — run `cargo build --release`")
 
     cases = json.loads(Path(args.cases).read_text())["cases"]
-    methods = ["raw", "netdistill:text", "netdistill:toon", "netdistill:wire",
-               "truncate", "strip-dedup", "llmlingua", "textfsm-json"]
+    default_methods = ["raw", "netdistill:text", "netdistill:toon", "netdistill:wire",
+                       "truncate", "strip-dedup", "llmlingua", "textfsm-json"]
+    methods = [m.strip() for m in args.methods.split(",") if m.strip()] or default_methods
     # results[m] = list over cases of dict(ok, ptok, est, supported)
     results = {m: [] for m in methods}
     print(f"model: {args.model}   methods: {len(methods)}   cases: {len(cases)}   num_ctx: {NUM_CTX}\n")
 
     for case in cases:
         raw = (FIXTURES / case["fixture"]).read_text()
-        built = build_methods(raw, case)
+        built = build_methods(raw, case, methods)
         line = f"{case['id']:<20}"
         for m in methods:
             ctx = built[m]
