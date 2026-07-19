@@ -184,6 +184,13 @@ are kept small so raw fits in context and answers are comparable; the saving
 grows with input size.) See [`eval/README.md`](eval/README.md) to reproduce or
 point it at another model.
 
+netdistill was also benchmarked **against the alternatives** — naive truncation,
+generic dedup compression, LLMLingua‑2, and TextFSM parsing — on two independent
+models. It answers 100% of questions at ~13% of raw's tokens; every alternative
+loses on fidelity, size, or coverage (truncation/compression drop the anomalies,
+TextFSM inflates to 589% of raw, LLMLingua‑2 shreds IPs). Full write‑up with
+methodology, tables, and threats to validity: **[eval/RESULTS.md](eval/RESULTS.md)**.
+
 ## Design principles
 
 1. **The LLM's job is diagnosis; give it evidence, not logs.** Anomalies and aggregates carry nearly all the diagnostic signal of raw output at a fraction of the tokens.

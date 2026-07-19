@@ -1,5 +1,10 @@
 # netdistill fidelity eval
 
+> **Looking for the write-up?** [`RESULTS.md`](RESULTS.md) is the paper-level
+> report: methodology, both models, per-case grids, the fidelity‑vs‑size figure,
+> and threats to validity. This file is the how-to for running the harnesses.
+
+
 **Claim under test:** an LLM reaches the *same answer* from a distilled digest
 as from the raw CLI output — at a fraction of the tokens.
 
