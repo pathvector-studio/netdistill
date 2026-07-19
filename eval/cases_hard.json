@@ -1,0 +1,45 @@
+{
+  "description": "Harder questions that stress the digest: multi-hop (combine facts across two commands in one session) and adversarial phrasing (negation, synonyms, distractors). Deterministic graders. kind 'auto' = let netdistill detect per chunk (multi-command session logs).",
+  "cases": [
+    {
+      "id": "multihop_tophop_as",
+      "fixture": "session_bgp_route.txt",
+      "kind": "auto",
+      "question": "The most-used next-hop IP in the routing table belongs to one of the BGP peers. What is that peer's AS number?",
+      "must_contain": ["64513"],
+      "must_not_contain": ["7018", "64515"]
+    },
+    {
+      "id": "multihop_maxpeer_routes",
+      "fixture": "session_bgp_route.txt",
+      "kind": "auto",
+      "question": "The BGP peer advertising the most prefixes has an IP address. How many routes in the routing table use that IP as their next-hop? Answer with just the number.",
+      "must_contain": ["13"],
+      "must_not_contain": []
+    },
+    {
+      "id": "adv_admin_vs_broken",
+      "fixture": "frr_bgp_summary.txt",
+      "kind": "bgp-summary",
+      "question": "Ignoring any peer that is administratively shut down, which peer is in a genuinely broken (unestablished, non-admin) state? Give its IP address.",
+      "must_contain": ["10.0.16.2"],
+      "must_not_contain": ["10.0.17.2"]
+    },
+    {
+      "id": "adv_egress_discard",
+      "fixture": "ios_show_interfaces.txt",
+      "kind": "interfaces",
+      "question": "Which uplink interface is discarding traffic on egress (dropping packets on output)? Give the interface name.",
+      "must_contain": ["0/1"],
+      "must_not_contain": []
+    },
+    {
+      "id": "adv_up_but_erroring",
+      "fixture": "ios_show_interfaces.txt",
+      "kind": "interfaces",
+      "question": "Which interface is operationally UP yet still logging input errors? Give its name.",
+      "must_contain": ["0/1"],
+      "must_not_contain": ["0/2"]
+    }
+  ]
+}

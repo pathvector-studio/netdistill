@@ -62,9 +62,13 @@ def est_tok(s):
 
 
 def netdistill(raw, fmt, kind):
+    # kind "auto"/None lets netdistill detect per chunk (needed for multi-command
+    # session logs that contain several different commands).
+    args = [str(BIN), "--format", fmt]
+    if kind and kind != "auto":
+        args += ["--kind", kind]
     return subprocess.run(
-        [str(BIN), "--format", fmt, "--kind", kind],
-        input=raw, capture_output=True, text=True, check=True,
+        args, input=raw, capture_output=True, text=True, check=True
     ).stdout
 
 

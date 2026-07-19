@@ -13,13 +13,16 @@ measuring **answer fidelity** (deterministically graded) against **real token
 cost** (the backend tokenizer's own count) on two independent open models
 (`gemma3:12b`, `qwen2.5:14b`).
 
-**Result.** netdistill's `text`/`toon` digests answer **100%** of questions at
-**~13% of raw's tokens** — and are *more accurate than raw itself* on a large
-table, because anomalies-first beats lost-in-the-middle. Every alternative loses
-on at least one of {fidelity, size, coverage}: truncation and generic
-compression drop the anomalies, TextFSM **inflates** tokens to 589% of raw, and
-LLMLingua‑2 (trained on prose) shreds IP addresses and silently deletes the down
-peers.
+**Result.** netdistill's digests answer **100%** of lookup questions at **~13% of
+raw's tokens** — and are *more accurate than raw itself* on a large table, because
+anomalies-first beats lost-in-the-middle. Every alternative loses on at least one
+of {fidelity, size, coverage}: truncation and generic compression drop the
+anomalies, TextFSM **inflates** tokens to 589% of raw, and LLMLingua‑2 (trained on
+prose) shreds IP addresses and silently deletes the down peers. Across three
+question shapes (lookup, row‑scan‑with‑condition, multi‑hop/adversarial) no single
+output format dominates — `text` is the safe all‑rounder (~97% mean) while
+`toon`/`wire` trade scan‑robustness for reasoning‑robustness and fewer tokens —
+but **every** netdistill format beats `raw` on every shape.
 
 ![fidelity vs size](fidelity_vs_size.svg)
 
@@ -209,6 +212,53 @@ Findings, partially against our own prediction:
 scans); `toon`/`wire` when squeezing tokens on lookup‑heavy workloads; reach for
 `kv` only if a specific model mis‑scans your tables.
 
+### 3.7 Multi-hop and adversarial questions
+
+Two more shapes that could expose the digest: **multi-hop** (combine facts across
+two commands in one session log — e.g. "the most-used next-hop IP belongs to a
+peer; what's its AS?") and **adversarial phrasing** (negation, synonyms, and a
+distractor: "ignoring admin-shut peers, which is *genuinely* broken?"). 5 cases,
+[`cases_hard.json`](cases_hard.json), reports
+[gemma](hard_report_gemma3_12b.md) / [qwen](hard_report_qwen25_14b.md).
+
+| method | gemma3:12b | qwen2.5:14b | size vs raw |
+|---|---|---|---|
+| netdistill:toon | 100% (5/5) | 100% (5/5) | 38% |
+| netdistill:wire | 100% (5/5) | 100% (5/5) | 35% |
+| netdistill:text | 80% (4/5) | 100% (5/5) | 38% |
+| netdistill:kv | 60% (3/5) | 100% (5/5) | 38% |
+| raw | 80% (4/5) | 60% (3/5) | 100% |
+
+- **Multi-hop survives distillation — and beats raw.** The cross-command AS
+  lookup passes everywhere; on the cross-command *count*, `raw` fails (qwen) while
+  every netdistill format passes. Precomputed aggregates (`TOP NEXT-HOPS`,
+  `largest peers`) turn a two-hop question into a one-hop read.
+- **The distractor is the hardest case, and `raw` fails it on both models.**
+  "Ignore admin‑shut peers, find the genuinely broken one" — `raw` picks the
+  admin‑disabled peer (or both); netdistill wins because it *labels* the state
+  `Idle (Admin)` distinctly from `Active`.
+- **Reversal vs §3.6.** Here `toon`/`wire` are the most robust (100%/100%) and
+  `text`/`kv` dip on gemma — the opposite ranking from the scan experiment. There
+  is **no single dominant format**; robustness depends on question shape.
+
+### 3.8 Format robustness by question shape (summary)
+
+Fidelity averaged over both models, per question shape:
+
+| format | lookup (§3.2) | scan+condition (§3.6) | multi-hop/adversarial (§3.7) | mean |
+|---|---|---|---|---|
+| **netdistill:text** | 100% | **100%** | 90% | **~97%** |
+| netdistill:wire | 95% | 75% | **100%** | ~90% |
+| netdistill:toon | 100% | 62% | **100%** | ~87% |
+| netdistill:kv | — | 88% | 80% | ~84% |
+| raw | 90% | 62% | 70% | ~74% |
+
+`text` is the safe all-rounder (never worst, best at scanning); `toon`/`wire`
+trade scan robustness for reasoning robustness and fewer tokens; `kv` is a
+situational fallback. **`raw` is the least robust across every shape** — the
+recurring result of this report. Shipping several formats is the point: pick by
+workload, all far cheaper and no less faithful than raw.
+
 ## 4. Findings
 
 1. **Distillation can beat raw.** Putting anomalies first defeats
@@ -227,20 +277,25 @@ scans); `toon`/`wire` when squeezing tokens on lookup‑heavy workloads; reach f
    netdistill format that dipped on the lookup suite (90% on gemma, 100% on qwen),
    for ~5% fewer tokens than `text`. Density trades against comprehension, as the
    report's own "bound density by measured comprehension" principle predicts.
-7. **Format choice depends on question shape (§3.6).** For lookups, `text`/`toon`
-   are equal; for row‑scan‑with‑condition, `text` (TSV+header) is clearly best
-   and `toon` is weakest. `text` is the robust default across both; `toon`/`wire`
-   are for token‑squeezing on lookup‑heavy work. This is why netdistill ships
-   several formats rather than one.
+7. **No format dominates; robustness is workload-dependent (§3.8).** `text` wins
+   scan‑with‑condition but `toon`/`wire` win multi‑hop/adversarial; all tie on
+   lookups. `text` is the best all‑rounder (~97% mean, never worst) and the safe
+   default; the others are for token‑squeezing or shape‑specific robustness. This
+   is why netdistill ships several formats rather than one — and across all three
+   shapes every format beats `raw`.
+8. **Distillation helps the *hard* questions most.** On multi‑hop and adversarial
+   distractors, `raw` is the least reliable of all (70% mean) — precomputed
+   aggregates collapse multi‑hop into lookups, and explicit state labels
+   (`Idle (Admin)` vs `Active`) defuse distractors that trip a model reading raw.
 
 ## 5. Threats to validity
 
-- **Small N.** 9–10 questions in the main suite, plus a 4‑question
-  scan‑with‑condition probe (§3.6). Still small and curated; a broader suite
-  (multi‑hop reasoning, more scan shapes, adversarial phrasings) could move the
-  numbers and is future work. The scan probe already surfaced a real format split
-  (`toon` weak, `text` robust), so question shape clearly matters and deserves
-  wider coverage.
+- **Small N.** 10 main‑suite questions plus two focused probes (4 scan‑with‑
+  condition §3.6, 5 multi‑hop/adversarial §3.7) — 19 in total. Still small and
+  curated; the probes each surfaced a real, *opposite* format split (§3.8), so
+  question shape clearly matters and a larger balanced suite is the obvious next
+  step. Reported numbers are per‑shape means over two models, not a single grand
+  average.
 - **Two models, one size class (12–14B).** Not tested on frontier or tiny models.
 - **Single run per cell.** `temperature=0` is near‑deterministic but not exactly;
   no variance bars.
@@ -267,10 +322,10 @@ uv pip install --python evalenv/bin/python llmlingua        # optional (heavy)
 evalenv/bin/python eval/compare.py --model gemma3:12b
 evalenv/bin/python eval/compare.py --model qwen2.5:14b
 
-# row-scan-with-condition probe (§3.6), with the self-contained kv format:
-evalenv/bin/python eval/compare.py --model gemma3:12b \
-  --cases eval/cases_scan.json \
-  --methods raw,netdistill:text,netdistill:toon,netdistill:wire,netdistill:kv
+# row-scan-with-condition probe (§3.6) and multi-hop/adversarial probe (§3.7):
+M=raw,netdistill:text,netdistill:toon,netdistill:wire,netdistill:kv
+evalenv/bin/python eval/compare.py --model gemma3:12b --cases eval/cases_scan.json --methods $M
+evalenv/bin/python eval/compare.py --model gemma3:12b --cases eval/cases_hard.json --methods $M
 ```
 
 Point `NETDISTILL_EVAL_URL` at any Ollama endpoint; missing optional deps degrade
