@@ -6,11 +6,11 @@ estimate (model-free, covers unsupported-for-QA methods too).
 
 | method | fidelity | avg real prompt tok | avg est ctx tok | size vs raw | cases |
 |---|---|---|---|---|---|
-| raw | 75% (3/4) | 898 | 468 | 100% | 4/4 |
-| netdistill:text | 100% (4/4) | 440 | 212 | 45% | 4/4 |
-| netdistill:toon | 75% (3/4) | 462 | 216 | 46% | 4/4 |
-| netdistill:wire | 75% (3/4) | 421 | 192 | 41% | 4/4 |
-| netdistill:kv | 100% (4/4) | 505 | 280 | 60% | 4/4 |
+| raw | 80% (4/5) | 866 | 441 | 100% | 5/5 |
+| netdistill:text | 100% (5/5) | 426 | 203 | 46% | 5/5 |
+| netdistill:toon | 60% (3/5) | 448 | 206 | 47% | 5/5 |
+| netdistill:wire | 80% (4/5) | 408 | 183 | 41% | 5/5 |
+| netdistill:kv | 100% (5/5) | 483 | 262 | 59% | 5/5 |
 
 ## per-case (✓ / ✗ / n·a unsupported)
 
@@ -20,3 +20,4 @@ estimate (model-free, covers unsupported-for-QA methods too).
 | route_bgp_gt2 | ✗ | ✓ | ✓ | ✓ | ✓ |
 | route_ospf_gt_bgp | ✓ | ✓ | ✗ | ✗ | ✓ |
 | config_transit_peergroup | ✓ | ✓ | ✓ | ✓ | ✓ |
+| junos_ospf_gt_bgp | ✓ | ✓ | ✗ | ✓ | ✓ |

@@ -20,15 +20,15 @@ of {fidelity, size, coverage}: truncation and generic compression drop the
 anomalies, TextFSM **inflates** tokens to 589% of raw, and LLMLingua‑2 (trained on
 prose) shreds IP addresses and silently deletes the down peers. Across three
 question shapes (lookup, row‑scan‑with‑condition, multi‑hop/adversarial) no single
-output format dominates — `text` is the safe all‑rounder (~97% mean) while
-`toon`/`wire` trade scan‑robustness for reasoning‑robustness and fewer tokens —
-but **every** netdistill format beats `raw` on every shape.
+output format dominates — `text` is the safe all‑rounder (~89% mean across all three
+models) while `toon`/`wire` trade scan‑robustness for reasoning‑robustness and
+fewer tokens — but **every** netdistill format beats `raw` (~66%) on every shape.
 
 ![fidelity vs size](fidelity_vs_size.svg)
 
-*Fidelity (y) vs context size relative to raw (x), averaged over both models.
-Top‑left is ideal. netdistill occupies it; every alternative sits low, right, or
-both.*
+*Fidelity (y) vs context size relative to raw (x), averaged over all three models
+(17-case suite, §3.2). Top‑left is ideal. netdistill occupies it; every
+alternative sits low, right, or both.*
 
 ---
 
@@ -196,84 +196,84 @@ to avoid. Hence 10% fidelity despite a healthy token budget.
 The table‑serialization literature warns that positional/tabular encodings weaken
 when the model must *scan rows and apply a condition* (it has to map a column
 position back to its header), and that self‑contained key=value objects help. We
-tested it directly: 4 questions that scan a **retained** table and filter it
+tested it directly: 5 questions that scan a **retained** table and filter it
 (e.g. "which VRFs carry >2 BGP routes", "which neighbor is in peer‑group
-TRANSIT"), adding a `netdistill:kv` format (each row as `col=val, col=val`).
-Harness: [`cases_scan.json`](cases_scan.json), reports
-[gemma](scan_report_gemma3_12b.md) / [qwen](scan_report_qwen25_14b.md).
+TRANSIT"), adding a `netdistill:kv` format (each row as `col=val, col=val`), on
+all 3 models. Harness: [`cases_scan.json`](cases_scan.json), reports
+[12b](scan_report_gemma3_12b.md) / [14b](scan_report_qwen2_5_14b.md) /
+[3b](scan_report_qwen2_5_3b.md).
 
-| format | gemma3:12b | qwen2.5:14b | size vs raw | note |
-|---|---|---|---|---|
-| **netdistill:text** (TSV + header) | **100% (4/4)** | **100% (4/4)** | 45% | robust *and* cheap |
-| netdistill:kv (self‑contained) | 75% | 100% | 60% | helps some models, +33% tokens |
-| netdistill:wire | 75% | 75% | 41% | middling |
-| netdistill:toon | 50% | 75% | 46% | **weakest at scanning** |
-| raw | 50% | 75% | 100% | noise hurts scanning too |
+| format | 12b | 14b | 3b | mean | note |
+|---|---|---|---|---|---|
+| **netdistill:text** (TSV + header) | **100%** | **100%** | 40% | **80%** | robust *and* cheap |
+| netdistill:kv (self‑contained) | 80% | 100% | 40% | 73% | helps some models, +33% tokens |
+| netdistill:wire | 60% | 80% | 40% | 60% | middling |
+| raw | 60% | 80% | 20% | 53% | noise hurts scanning too |
+| netdistill:toon | 40% | 60% | 40% | 47% | **weakest at scanning** |
 
 Findings, partially against our own prediction:
 
 - The predicted weakness is real, but it lands on **`toon`**, not "tabular" in
   general — its comma‑packed `[N]{cols}` rows are hardest to scan, even though
-  `toon` ties `text` on lookups (§3.1–3.2).
-- **`text` (tab‑separated with a header row) is the most robust format for
-  scan‑with‑condition — 100% on both models — and stays token‑cheap.** It is the
-  safe default across *both* question shapes.
-- **`kv` only partly confirms the literature:** it beat `toon`/`wire` and hit
-  100% on qwen, but not on gemma, and costs ~33% more tokens. A targeted fallback
-  for a model that struggles, not a free win.
-- Even `raw` scores 50–75% here: removing noise helps the model scan, so
-  distillation aids this shape too — just pick `text`.
-
-**Practical guidance:** `text` for general use (robust on both lookups and
-scans); `toon`/`wire` when squeezing tokens on lookup‑heavy workloads; reach for
-`kv` only if a specific model mis‑scans your tables.
+  `toon` ties `text` on lookups (§3.2). `text` (TSV + header) is the most robust
+  scan format on both larger models and the token‑cheapest of the safe options.
+- **`kv` only partly confirms the literature:** it beats `toon`/`wire` and hits
+  100% on 14b, but not on 12b/3b, and costs ~33% more tokens. A targeted fallback
+  for a model that mis‑scans, not a free win.
+- The 3B model collapses to ~40% for *every* format here — scan‑with‑condition is
+  simply hard for a small model regardless of encoding.
+- Even `raw` scores 53% mean: removing noise helps scanning too — just pick `text`.
 
 ### 3.7 Multi-hop and adversarial questions
 
-Two more shapes that could expose the digest: **multi-hop** (combine facts across
-two commands in one session log — e.g. "the most-used next-hop IP belongs to a
-peer; what's its AS?") and **adversarial phrasing** (negation, synonyms, and a
-distractor: "ignoring admin-shut peers, which is *genuinely* broken?"). 5 cases,
+Two more shapes: **multi-hop** (combine facts across two commands in one session
+log — "the most-used next-hop IP belongs to a peer; what's its AS?") and
+**adversarial phrasing** (negation, synonyms, and a distractor: "ignoring
+admin-shut peers, which is *genuinely* broken?"). 5 cases, 3 models.
 [`cases_hard.json`](cases_hard.json), reports
-[gemma](hard_report_gemma3_12b.md) / [qwen](hard_report_qwen25_14b.md).
+[12b](hard_report_gemma3_12b.md) / [14b](hard_report_qwen2_5_14b.md) /
+[3b](hard_report_qwen2_5_3b.md).
 
-| method | gemma3:12b | qwen2.5:14b | size vs raw |
-|---|---|---|---|
-| netdistill:toon | 100% (5/5) | 100% (5/5) | 38% |
-| netdistill:wire | 100% (5/5) | 100% (5/5) | 35% |
-| netdistill:text | 80% (4/5) | 100% (5/5) | 38% |
-| netdistill:kv | 60% (3/5) | 100% (5/5) | 38% |
-| raw | 80% (4/5) | 60% (3/5) | 100% |
+| method | 12b | 14b | 3b | mean |
+|---|---|---|---|---|
+| netdistill:text | 80% | 100% | 100% | **93%** |
+| netdistill:toon | 100% | 100% | 80% | **93%** |
+| netdistill:wire | 100% | 100% | 60% | 87% |
+| netdistill:kv | 60% | 100% | 80% | 80% |
+| raw | 80% | 60% | 60% | 67% |
 
 - **Multi-hop survives distillation — and beats raw.** The cross-command AS
-  lookup passes everywhere; on the cross-command *count*, `raw` fails (qwen) while
-  every netdistill format passes. Precomputed aggregates (`TOP NEXT-HOPS`,
+  lookup passes everywhere; on the cross-command *count*, `raw` fails while every
+  netdistill format passes. Precomputed aggregates (`TOP NEXT-HOPS`,
   `largest peers`) turn a two-hop question into a one-hop read.
-- **The distractor is the hardest case, and `raw` fails it on both models.**
+- **The distractor is the hardest case, and `raw` fails it across models.**
   "Ignore admin‑shut peers, find the genuinely broken one" — `raw` picks the
   admin‑disabled peer (or both); netdistill wins because it *labels* the state
-  `Idle (Admin)` distinctly from `Active`.
-- **Reversal vs §3.6.** Here `toon`/`wire` are the most robust (100%/100%) and
-  `text`/`kv` dip on gemma — the opposite ranking from the scan experiment. There
-  is **no single dominant format**; robustness depends on question shape.
+  `Idle (Admin)` distinctly from `Active`. Explicit elision is not just honest,
+  it is *load‑bearing* for reasoning.
+- **Reversal vs §3.6.** Here `toon`/`wire` are top on the larger models while
+  `text` leads by staying robust on the 3B model — the opposite ranking from the
+  scan experiment. **No single dominant format**; robustness depends on shape
+  *and* model size (`wire` drops to 60% on 3B).
 
 ### 3.8 Format robustness by question shape (summary)
 
-Fidelity averaged over both models, per question shape:
+Fidelity averaged over all three models, per question shape:
 
-| format | lookup (§3.2) | scan+condition (§3.6) | multi-hop/adversarial (§3.7) | mean |
+| format | lookup (§3.2) | scan+cond (§3.6) | multi-hop/adv (§3.7) | mean |
 |---|---|---|---|---|
-| **netdistill:text** | 100% | **100%** | 90% | **~97%** |
-| netdistill:wire | 95% | 75% | **100%** | ~90% |
-| netdistill:toon | 100% | 62% | **100%** | ~87% |
-| netdistill:kv | — | 88% | 80% | ~84% |
-| raw | 90% | 62% | 70% | ~74% |
+| **netdistill:text** | **94%** | **80%** | 93% | **~89%** |
+| netdistill:toon | 90% | 47% | 93% | ~77% |
+| netdistill:wire | 84% | 60% | 87% | ~77% |
+| netdistill:kv | — | 73% | 80% | ~77% |
+| raw | 78% | 53% | 67% | ~66% |
 
-`text` is the safe all-rounder (never worst, best at scanning); `toon`/`wire`
-trade scan robustness for reasoning robustness and fewer tokens; `kv` is a
-situational fallback. **`raw` is the least robust across every shape** — the
-recurring result of this report. Shipping several formats is the point: pick by
-workload, all far cheaper and no less faithful than raw.
+`text` is the safe all-rounder — top or tied on every shape, best at scanning,
+and token‑cheap. `toon`/`wire` trade scan robustness for reasoning robustness and
+a few fewer tokens; `kv` is a situational fallback. **`raw` is the least robust
+across every shape** (~66%) — the recurring result of this report. Shipping
+several formats is the point: pick by workload, all far cheaper and no less
+faithful than raw.
 
 ## 4. Findings
 
@@ -285,22 +285,22 @@ workload, all far cheaper and no less faithful than raw.
 3. **Domain awareness is the moat.** `strip-dedup` (generic compression) barely
    shrinks unique lines (64%) *and* loses anomalies — beaten by netdistill on
    **both** axes.
-4. **Parsing is not compression.** TextFSM inflates to **589%** of raw and covers
-   only 6/10 inputs.
+4. **Parsing is not compression.** TextFSM inflates JSON to 1.3–3.8× raw per input
+   (§3.4) and covers only 6/17 inputs (no XR/EOS/VRP/FRR/Junos/config templates).
 5. **SOTA prose compression is actively harmful here.** LLMLingua‑2 destroys the
-   structure it can't recognize.
-6. **Density has a measurable ceiling.** `wire` (the densest format) is the one
-   netdistill format that dipped on the lookup suite (90% on gemma, 100% on qwen),
-   for ~5% fewer tokens than `text`. Density trades against comprehension, as the
+   structure it can't recognize (~6–18% fidelity).
+6. **Density has a measurable ceiling that scales with model size.** `wire` (the
+   densest format) dipped on lookups (88% on 12b) and falls hardest on the 3B
+   model (65% lookup, 60% multi‑hop) — the density→comprehension tradeoff the
    report's own "bound density by measured comprehension" principle predicts.
 7. **No format dominates; robustness is workload-dependent (§3.8).** `text` wins
-   scan‑with‑condition but `toon`/`wire` win multi‑hop/adversarial; all tie on
-   lookups. `text` is the best all‑rounder (~97% mean, never worst) and the safe
-   default; the others are for token‑squeezing or shape‑specific robustness. This
-   is why netdistill ships several formats rather than one — and across all three
-   shapes every format beats `raw`.
+   scan‑with‑condition but `toon`/`wire` match or lead on multi‑hop/adversarial;
+   all tie on lookups (on larger models). `text` is the best all‑rounder (~89%
+   3‑model mean, never worst) and the safe default; the others are for
+   token‑squeezing or shape‑specific robustness. This is why netdistill ships
+   several formats rather than one — and across every shape every format beats `raw`.
 8. **Distillation helps the *hard* questions most.** On multi‑hop and adversarial
-   distractors, `raw` is the least reliable of all (70% mean) — precomputed
+   distractors, `raw` is the least reliable of all (~67% mean) — precomputed
    aggregates collapse multi‑hop into lookups, and explicit state labels
    (`Idle (Admin)` vs `Active`) defuse distractors that trip a model reading raw.
 
@@ -310,13 +310,16 @@ workload, all far cheaper and no less faithful than raw.
   condition §3.6, 5 multi‑hop/adversarial §3.7) — 19 in total. Still small and
   curated; the probes each surfaced a real, *opposite* format split (§3.8), so
   question shape clearly matters and a larger balanced suite is the obvious next
-  step. Reported numbers are per‑shape means over two models, not a single grand
+  step. Reported numbers are per‑shape means over three models, not a single grand
   average.
 - **Three open models spanning 3B–14B**, but all open‑weight and none frontier.
   The size axis is now covered (§3.2 shows the ordering holds down to 3B); a
   frontier‑model and a sub‑1B run remain future work.
-- **Single run per cell.** `temperature=0` is near‑deterministic but not exactly;
-  no variance bars.
+- **Single run per cell — checked.** A full re‑run of the 17‑case suite on
+  `gemma3:12b` at `temperature=0` reproduced every method's score exactly (raw
+  82%, text/toon 100%, wire 88%, …), so decoding is deterministic here and a
+  single run is representative. A temperature sweep for genuine variance bars is
+  still future work.
 - **Substring grading** can, in principle, reward a lucky substring; mitigated by
   distinctive IP/hostname targets and `must_not_contain` guards.
 - **Baselines are not maximally tuned.** LLMLingua‑2 uses the bert‑base variant at
