@@ -6,14 +6,14 @@ estimate (model-free, covers unsupported-for-QA methods too).
 
 | method | fidelity | avg real prompt tok | avg est ctx tok | size vs raw | cases |
 |---|---|---|---|---|---|
-| raw | 90% (9/10) | 2504 | 1686 | 100% | 10/10 |
-| netdistill:text | 100% (10/10) | 453 | 226 | 13% | 10/10 |
-| netdistill:toon | 100% (10/10) | 470 | 227 | 13% | 10/10 |
-| netdistill:wire | 100% (10/10) | 437 | 206 | 12% | 10/10 |
-| truncate | 30% (3/10) | 445 | 212 | 13% | 10/10 |
-| strip-dedup | 90% (9/10) | 2383 | 1082 | 64% | 10/10 |
-| llmlingua | 10% (1/10) | 959 | 353 | 21% | 10/10 |
-| textfsm-json | 67% (4/6) | 3925 | 9937 | 589% | 6/10 |
+| raw | 82% (14/17) | 1676 | 1080 | 100% | 17/17 |
+| netdistill:text | 100% (17/17) | 417 | 200 | 18% | 17/17 |
+| netdistill:toon | 100% (17/17) | 434 | 201 | 19% | 17/17 |
+| netdistill:wire | 100% (17/17) | 401 | 180 | 17% | 17/17 |
+| truncate | 41% (7/17) | 411 | 187 | 17% | 17/17 |
+| strip-dedup | 88% (15/17) | 1590 | 701 | 65% | 17/17 |
+| llmlingua | 6% (1/17) | 643 | 229 | 21% | 17/17 |
+| textfsm-json | 67% (4/6) | 3925 | 9937 | 920% | 6/17 |
 
 ## per-case (✓ / ✗ / n·a unsupported)
 
@@ -29,3 +29,10 @@ estimate (model-free, covers unsupported-for-QA methods too).
 | config_bgp_neighbors | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✗ | n·a |
 | config_hostname | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | n·a |
 | big_bgp_buried_down | ✗ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ |
+| xr_bgp_not_established | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✗ | n·a |
+| eos_bgp_broken | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | n·a |
+| vrp_bgp_broken | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | n·a |
+| nxos_no_default_route | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✗ | n·a |
+| junos_hidden_route | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | n·a |
+| isis_stuck_adjacency | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | n·a |
+| bgptable_top_origin_as | ✗ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | n·a |

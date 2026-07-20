@@ -78,23 +78,28 @@ head-to-head against the *other* ways engineers get device output into an LLM:
 | `llmlingua` | LLMLingua-2 (Microsoft) — academic SOTA task-agnostic prompt compression |
 | `textfsm-json` | ntc-templates / TextFSM parsed → JSON (structure, not summary) |
 
-Same fidelity question, same grader, real prompt-token counts. Result on
-gemma3:12b (10 cases, see [`compare_report.md`](compare_report.md)):
+Same fidelity question, same grader, real prompt-token counts. Result over 17
+vendor-broad questions on three model sizes (full write-up and per-case grids in
+[`RESULTS.md`](RESULTS.md); reports: [12b](compare_report_gemma3_12b.md) ·
+[14b](compare_report_qwen2_5_14b.md) · [3b](compare_report_qwen2_5_3b.md)):
 
-| method | fidelity | size vs raw |
-|---|---|---|
-| netdistill:text / toon | **100%** | **13%** |
-| raw | 90% | 100% |
-| truncate | 40% | 13% |
-| strip-dedup | 70% | 64% |
-| llmlingua | (domain-blind, silently drops anomalies) | — |
-| textfsm-json | 67% (6/10 covered) | **589%** (bigger than raw) |
+| method | 12b | 14b | 3b | size vs raw |
+|---|---|---|---|---|
+| netdistill:text | **100%** | **100%** | **82%** | 18% |
+| netdistill:toon | **100%** | **100%** | 71% | 19% |
+| raw | 82% | 82% | 71% | 100% |
+| strip-dedup | 71% | 88% | 71% | 65% |
+| truncate | 53% | 41% | 29% | 17% |
+| llmlingua | 6% | 6% | 18% | 21% |
+| textfsm-json | 67% (6/17) | 67% | 67% | 5–9× raw |
 
-Two findings worth the harness: netdistill can be **more accurate than raw**
-(anomalies-first beats lost-in-the-middle on a 500-peer table), and every
-alternative loses on at least one axis — truncation and generic compression
-drop the anomalies, TextFSM *inflates* tokens, and LLMLingua-2 (trained on
-meeting transcripts) shreds IP addresses and silently deletes the down peers.
+Findings worth the harness: netdistill can be **more accurate than raw**
+(anomalies-first beats lost-in-the-middle on a 500-peer table); the advantage is
+**size-robust** (ordering holds down to a 3B model, where denser formats lose
+more); and every alternative loses on at least one axis — truncation and generic
+compression drop the anomalies, TextFSM *inflates* tokens and covers 6/17, and
+LLMLingua-2 (trained on meeting transcripts) shreds IP addresses and silently
+deletes the down peers.
 
 `compare.py` needs the eval venv **plus** `textfsm ntc-templates` and,
 optionally, `llmlingua` (heavy — pulls torch/transformers):

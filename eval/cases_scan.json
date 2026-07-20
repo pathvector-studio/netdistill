@@ -32,6 +32,14 @@
       "question": "Which BGP neighbor IP address belongs to the peer-group named TRANSIT?",
       "must_contain": ["10.0.13.2"],
       "must_not_contain": ["10.0.12.2"]
+    },
+    {
+      "id": "junos_ospf_gt_bgp",
+      "fixture": "junos_show_route.txt",
+      "kind": "route-table",
+      "question": "Which single routing table has MORE OSPF routes than BGP routes? Give just its name.",
+      "must_contain": ["inet.0"],
+      "must_not_contain": ["CUST-A"]
     }
   ]
 }

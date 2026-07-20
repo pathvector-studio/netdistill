@@ -80,6 +80,62 @@
       "question": "Out of 500 BGP peers, which few are NOT in an Established state (shown as Active/Idle)? List their neighbor IP addresses.",
       "must_contain": ["10.20.1.7", "10.20.2.44", "10.20.4.19"],
       "must_not_contain": []
+    },
+    {
+      "id": "xr_bgp_not_established",
+      "fixture": "xr_bgp_summary.txt",
+      "kind": "bgp-summary",
+      "question": "Which BGP peer is NOT in the Established state? Give its IP address.",
+      "must_contain": ["10.0.16.2"],
+      "must_not_contain": ["10.0.14.2", "10.0.12.2"]
+    },
+    {
+      "id": "eos_bgp_broken",
+      "fixture": "eos_bgp_summary.txt",
+      "kind": "bgp-summary",
+      "question": "List the IP addresses of all BGP peers that are not in the Established state.",
+      "must_contain": ["10.0.16.2", "10.0.17.2"],
+      "must_not_contain": ["10.0.13.2"]
+    },
+    {
+      "id": "vrp_bgp_broken",
+      "fixture": "vrp_display_bgp_peer.txt",
+      "kind": "bgp-summary",
+      "question": "Which BGP peer is not in the Established state? Give its IP address.",
+      "must_contain": ["10.0.16.2"],
+      "must_not_contain": ["10.0.14.2"]
+    },
+    {
+      "id": "nxos_no_default_route",
+      "fixture": "nxos_show_ip_route.txt",
+      "kind": "route-table",
+      "question": "Which VRF has no default route (no gateway of last resort)?",
+      "must_contain": ["management"],
+      "must_not_contain": []
+    },
+    {
+      "id": "junos_hidden_route",
+      "fixture": "junos_show_route.txt",
+      "kind": "route-table",
+      "question": "Which routing table contains a hidden route?",
+      "must_contain": ["inet.0"],
+      "must_not_contain": []
+    },
+    {
+      "id": "isis_stuck_adjacency",
+      "fixture": "ios_isis_neighbors.txt",
+      "kind": "isis-neighbors",
+      "question": "Which IS-IS adjacency is stuck (state not UP)? Give its system-id.",
+      "must_contain": ["edge-1"],
+      "must_not_contain": []
+    },
+    {
+      "id": "bgptable_top_origin_as",
+      "fixture": "ios_show_ip_bgp.txt",
+      "kind": "bgp-table",
+      "question": "Which origin AS contributes the most best paths to the BGP table?",
+      "must_contain": ["65010"],
+      "must_not_contain": ["7018", "3356"]
     }
   ]
 }

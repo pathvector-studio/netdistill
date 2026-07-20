@@ -10,8 +10,8 @@ if the model can **still answer** afterwards. We benchmark netdistill's digests
 against the other ways engineers get device output into an LLM (raw paste, naive
 truncation, generic dedup/strip compression, LLMLingua‑2, and TextFSM parsing),
 measuring **answer fidelity** (deterministically graded) against **real token
-cost** (the backend tokenizer's own count) on two independent open models
-(`gemma3:12b`, `qwen2.5:14b`).
+cost** (the backend tokenizer's own count) on three independent open models
+spanning 3B–14B (`gemma3:12b`, `qwen2.5:14b`, `qwen2.5:3b`).
 
 **Result.** netdistill's digests answer **100%** of lookup questions at **~13% of
 raw's tokens** — and are *more accurate than raw itself* on a large table, because
@@ -50,7 +50,8 @@ question and grader are identical across methods.
 
 ## 2. Experimental setup
 
-- **Models.** `gemma3:12b` (gemma3, 12.2B, Q4_K_M) and `qwen2.5:14b`, served by
+- **Models.** `gemma3:12b` (gemma3, 12.2B, Q4_K_M), `qwen2.5:14b`, and
+  `qwen2.5:3b` (a deliberate small model to probe the size axis), served by
   Ollama. Deliberately **not** the model that authored the code — no self‑grading.
 - **Decoding.** `temperature=0`, `num_predict=128`, `num_ctx=16384` (comparison)
   so `raw` and most methods fit; contexts exceeding it are a recorded failure,
@@ -94,40 +95,47 @@ All formats carry the answer — including their explicit elision notes — at
 roughly half the tokens. `json` is the least efficient (repeated keys); `toon`
 delivers most of `json`'s structure at `text`/`wire` token cost.
 
-### 3.2 Head‑to‑head vs the alternatives — 10 questions
+### 3.2 Head‑to‑head vs the alternatives — 17 questions, 3 model sizes
 
-Averages over the 10‑case suite (adds the buried‑anomaly case). `est` is a
-model‑free char estimate so it can cover methods that don't answer.
+17 questions spanning IOS/IOS‑XR/NX‑OS/EOS/Huawei VRP/FRR/Junos across
+bgp‑summary, bgp‑table, route‑table, interfaces, config, ospf, isis and lldp.
+Run on three model sizes to test the "one size class" worry. `est` is a
+model‑free char estimate so it can cover methods that don't answer. Reports:
+[gemma3:12b](compare_report_gemma3_12b.md) ·
+[qwen2.5:14b](compare_report_qwen2_5_14b.md) ·
+[qwen2.5:3b](compare_report_qwen2_5_3b.md).
 
-**gemma3:12b** ([report](compare_report.md))
+| method | gemma3:12b | qwen2.5:14b | qwen2.5:3b | size vs raw | coverage |
+|---|---|---|---|---|---|
+| **netdistill:text** | **100%** | **100%** | **82%** | 18% | 17/17 |
+| **netdistill:toon** | **100%** | **100%** | 71% | 19% | 17/17 |
+| netdistill:wire | 88% | **100%** | 65% | 17% | 17/17 |
+| raw | 82% | 82% | 71% | 100% | 17/17 |
+| strip-dedup | 71% | 88% | 71% | 65% | 17/17 |
+| truncate | 53% | 41% | 29% | 17% | 17/17 |
+| llmlingua | 6% | 6% | 18% | 21% | 17/17 |
+| textfsm-json | 67% | 67% | 67% | 5–9× raw † | **6/17** |
 
-| method | fidelity | real prompt tok | size vs raw | cases covered |
-|---|---|---|---|---|
-| **netdistill:text** | **100% (10/10)** | 461 | **13%** | 10/10 |
-| **netdistill:toon** | **100% (10/10)** | 476 | **13%** | 10/10 |
-| netdistill:wire | 90% (9/10) | 440 | 12% | 10/10 |
-| raw | 90% (9/10) | 2494 | 100% | 10/10 |
-| strip-dedup | 70% (7/10) | 2388 | 64% | 10/10 |
-| truncate | 40% (4/10) | 428 | 13% | 10/10 |
-| llmlingua | 10% (1/10) | 1047 | 21% | 10/10 |
-| textfsm-json | 67% (4/6) | 4110 | **589%** | 6/10 |
+† TextFSM covers only the 6 cisco_ios‑template cases; on those its JSON is
+1.3–3.8× the raw per input (§3.4), and the aggregate blows past raw once the
+500‑peer table is included. No template matched the XR/EOS/VRP/FRR/Junos/config
+fixtures — recorded as `n·a`.
 
-**qwen2.5:14b** ([report](compare_report_qwen25_14b.md))
+**Reading the table.** On both 12–14B models `text`/`toon` hold **100%** even as
+the suite widened to 8 parsers and 7 vendors, at ~18% of raw's tokens. The small
+3B model drops everything — but the **ordering is preserved**: `text` (82%) still
+leads, still beats `raw` (71%), `truncate` (29%) and `llmlingua` (18%). So
+netdistill's advantage is size‑robust; the model just gets weaker.
 
-| method | fidelity | real prompt tok | size vs raw | cases covered |
-|---|---|---|---|---|
-| **netdistill:text** | **100% (10/10)** | 453 | **13%** | 10/10 |
-| **netdistill:toon** | **100% (10/10)** | 470 | **13%** | 10/10 |
-| **netdistill:wire** | **100% (10/10)** | 437 | 12% | 10/10 |
-| raw | 90% (9/10) | 2504 | 100% | 10/10 |
-| strip-dedup | 90% (9/10) | 2383 | 64% | 10/10 |
-| truncate | 30% (3/10) | 445 | 13% | 10/10 |
-| llmlingua | 10% (1/10) | 959 | 21% | 10/10 |
-| textfsm-json | 67% (4/6) | 3925 | 589% | 6/10 |
+A second, sharper result: **denser formats cost more on weaker models.** On the
+3B model `text` (82%, most explicit) clearly beats `toon` (71%) and `wire` (65%),
+whereas on the 14B model all three tie at 100%. The density→comprehension tradeoff
+scales with model capability — another reason `text` is the safe default,
+especially if a small model is in the loop.
 
-### 3.3 Per‑case grid (gemma3:12b)
+### 3.3 Per‑case grid (gemma3:12b, 17 cases)
 
-| case | raw | text | toon | wire | truncate | strip‑dedup | llmlingua | textfsm |
+| case | raw | text | toon | wire | trunc | strip | lingua | tfsm |
 |---|---|---|---|---|---|---|---|---|
 | bgp_down_peers | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | n·a |
 | bgp_total_peers | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | n·a |
@@ -139,10 +147,18 @@ model‑free char estimate so it can cover methods that don't answer.
 | config_bgp_neighbors | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✗ | n·a |
 | config_hostname | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | n·a |
 | **big_bgp_buried_down** | **✗** | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ |
+| xr_bgp_not_established | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | n·a |
+| eos_bgp_broken | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✗ | n·a |
+| vrp_bgp_broken | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | n·a |
+| nxos_no_default_route | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✗ | n·a |
+| junos_hidden_route | ✗ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | n·a |
+| isis_stuck_adjacency | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | n·a |
+| bgptable_top_origin_as | ✗ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | n·a |
 
-The last row is the crux: with 3 broken peers buried in a 500‑peer table, **raw
-itself fails** — the model loses them in the middle — while `netdistill:text/toon`
-surface them at the top and answer correctly.
+The `big_bgp_buried_down` row is the crux: with 3 broken peers buried in a
+500‑peer table, **raw itself fails** (lost in the middle) while `text`/`toon`
+surface them at the top. `raw` also misses `junos_hidden_route` and
+`bgptable_top_origin_as` — facts netdistill lifts into an alert or a ranked table.
 
 ### 3.4 Parse ≠ compress (TextFSM output size)
 
@@ -296,7 +312,9 @@ workload, all far cheaper and no less faithful than raw.
   question shape clearly matters and a larger balanced suite is the obvious next
   step. Reported numbers are per‑shape means over two models, not a single grand
   average.
-- **Two models, one size class (12–14B).** Not tested on frontier or tiny models.
+- **Three open models spanning 3B–14B**, but all open‑weight and none frontier.
+  The size axis is now covered (§3.2 shows the ordering holds down to 3B); a
+  frontier‑model and a sub‑1B run remain future work.
 - **Single run per cell.** `temperature=0` is near‑deterministic but not exactly;
   no variance bars.
 - **Substring grading** can, in principle, reward a lucky substring; mitigated by
@@ -329,9 +347,11 @@ evalenv/bin/python eval/compare.py --model gemma3:12b --cases eval/cases_hard.js
 ```
 
 Point `NETDISTILL_EVAL_URL` at any Ollama endpoint; missing optional deps degrade
-to `n·a` rather than failing the run. Raw per‑run reports:
-[gemma format](report_gemma3_12b.md) · [qwen format](report_qwen25_14b.md) ·
-[gemma compare](compare_report.md) · [qwen compare](compare_report_qwen25_14b.md).
+to `n·a` rather than failing the run. Raw per‑run reports: compare
+[gemma3:12b](compare_report_gemma3_12b.md) ·
+[qwen2.5:14b](compare_report_qwen2_5_14b.md) ·
+[qwen2.5:3b](compare_report_qwen2_5_3b.md); format fidelity
+[gemma](report_gemma3_12b.md) · [qwen](report_qwen25_14b.md).
 
 ## 7. Related work
 
