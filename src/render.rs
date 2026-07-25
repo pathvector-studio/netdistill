@@ -75,7 +75,8 @@ fn render_budgeted(
     };
     loop {
         let body = body_fn(&docs);
-        let out_tokens = token::estimate(&body) + receipt_tok;
+        let (body_tok, is_real) = token::count(&body);
+        let out_tokens = body_tok + receipt_tok;
         let fits = budget.is_none_or(|b| out_tokens <= b);
         if fits || !shrink(&mut docs) {
             let pct: i64 = if input_tokens > 0 {
@@ -84,13 +85,19 @@ fn render_budgeted(
                 0
             };
             let mut s = match fmt {
-                Format::Wire => format!("nd in={input_tokens} out={out_tokens} save={pct}% (est)\n"),
+                Format::Wire => {
+                    let tag = if is_real { "o200k" } else { "est" };
+                    format!("nd in={input_tokens} out={out_tokens} save={pct}% ({tag})\n")
+                }
                 Format::Toon => format!(
                     "netdistill[1]{{in_tok,out_tok,saved}}:\n  {input_tokens},{out_tokens},{pct}%\n\n"
                 ),
-                _ => format!(
-                    "# netdistill — input ~{input_tokens} tok → output ~{out_tokens} tok ({pct}% saved; estimates)\n\n"
-                ),
+                _ => {
+                    let src = if is_real { "o200k" } else { "estimates" };
+                    format!(
+                        "# netdistill — input ~{input_tokens} tok → output ~{out_tokens} tok ({pct}% saved; {src})\n\n"
+                    )
+                }
             };
             s.push_str(&body);
             if !fits {

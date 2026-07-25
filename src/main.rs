@@ -133,7 +133,7 @@ fn main() {
     let mut in_tok = 0usize;
 
     let mut feed = |text: &str, name: Option<String>| {
-        in_tok += token::estimate(text);
+        in_tok += token::count(text).0;
         let mut ds = distill(text, &opts);
         if let Some(nm) = name {
             for d in &mut ds {

@@ -77,6 +77,14 @@ cargo install --path .
 # or: cargo build --release   → target/release/netdistill
 ```
 
+By default the token receipt is a fast char-based **estimate** (labeled `estimates`/`(est)`). To count with the real GPT-4o BPE tokenizer (`o200k_base`, vocab embedded — still fully offline), build with the optional feature (needs a recent Rust toolchain):
+
+```bash
+cargo build --release --features real-tokens
+```
+
+The receipt then reports exact counts (labeled `o200k` instead of `est`/`estimates`). The feature is off by default so the standard build stays dependency-light.
+
 ## Usage
 
 ```bash

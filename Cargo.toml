@@ -11,6 +11,14 @@ clap = { version = "4", features = ["derive"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tiny_http = "0.12"
+# Optional real tokenizer, off by default. The o200k_base (GPT-4o) BPE vocab is
+# embedded in the crate, so counting stays fully offline — no network at runtime.
+tiktoken-rs = { version = "0.12", optional = true }
+
+[features]
+# Count receipt tokens with a real BPE tokenizer instead of the char estimate.
+# Off by default so the default build pulls no extra deps and stays lean/fast.
+real-tokens = ["dep:tiktoken-rs"]
 
 [profile.release]
 strip = true

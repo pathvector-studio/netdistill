@@ -43,7 +43,7 @@ pub fn diff_to_string(
 ) -> String {
     let opts = Options { full: true, kind };
     let docs = diff::diff_docs_with(distill(before, &opts), distill(after, &opts), drift_pct);
-    let in_tok = token::estimate(before) + token::estimate(after);
+    let in_tok = token::count(before).0 + token::count(after).0;
     render::render(docs, in_tok, budget, format)
 }
 
@@ -85,7 +85,7 @@ pub fn distill_to_string(
     kind: Option<Kind>,
     section: Option<&str>,
 ) -> String {
-    let in_tok = token::estimate(input);
+    let in_tok = token::count(input).0;
     // Drill-down implies a full parse: the requested table must not be elided.
     let eff_full = full || section.is_some();
     let mut docs = distill(

@@ -45,7 +45,7 @@
 - [x] Result: on gemma3:12b **all formats scored 100% (9/9)** while `wire`/`toon`/`text` cut real prompt tokens to ~46-49% of raw — the digest carries the answer at half the tokens. Cross-checked on qwen2.5:14b. Reports in `eval/`.
 
 ## next
-- [ ] Real tokenizer-based counting inside the CLI (behind a feature flag) so the receipt line stops being an estimate — the eval already uses the model's true count
+- [x] Real tokenizer-based counting inside the CLI (behind a feature flag) so the receipt line stops being an estimate — the eval already uses the model's true count. Build with `--features real-tokens` (o200k_base BPE, embedded/offline); the receipt then reads `o200k` instead of `est`/`estimates`.
 - [ ] Larger/harder eval cases (multi-hop questions, diff snapshots) and a pass/fail CI gate on fidelity regressions
 - [ ] Library crate API stabilization
 - [ ] ntc-templates corpus regression harness
