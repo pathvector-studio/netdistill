@@ -37,15 +37,23 @@ mod real_token_tests {
     fn count_is_real_and_nonzero() {
         let sample = "show ip bgp summary\nBGP router identifier 10.0.0.1, local AS number 65001";
         let (n, is_real) = count(sample);
-        assert!(is_real, "count() must report a real tokenizer with the feature on");
+        assert!(
+            is_real,
+            "count() must report a real tokenizer with the feature on"
+        );
         assert!(n > 0, "real tokenizer must return a non-zero count");
     }
 
     #[test]
     fn count_differs_from_estimate() {
-        let sample = "show ip bgp summary\nNeighbor V AS MsgRcvd MsgSent TblVer InQ OutQ Up/Down State";
+        let sample =
+            "show ip bgp summary\nNeighbor V AS MsgRcvd MsgSent TblVer InQ OutQ Up/Down State";
         let (n, _) = count(sample);
         // A real BPE tokenizer will not agree with the crude chars*2/7 heuristic.
-        assert_ne!(n, estimate(sample), "real count should differ from the estimate");
+        assert_ne!(
+            n,
+            estimate(sample),
+            "real count should differ from the estimate"
+        );
     }
 }
