@@ -2,6 +2,8 @@
 
 English | [日本語](README.ja.md)
 
+> **Status: experimental.** This is a working prototype and is not under active development right now. It does what this README describes, but expect rough edges. Issues and feedback are welcome.
+
 **Stop pasting 50,000 lines of `show ip route` into your LLM.**
 
 Network CLI output is built for human eyes: fixed-width padding, repeated headers, and thousands of lines where 99% say "everything is normal". Paste that into an LLM and you burn the context window on padding — a full-table `show route vrf all` is *millions* of tokens and simply does not fit.
